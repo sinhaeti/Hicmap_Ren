@@ -1,2 +1,3 @@
 # Hicmap_Ren
-Map and process Hi-C data. 
+Fast pipeline for Hi-C data analysis including mapping and reads filtering.
+ 

@@ -7,7 +7,7 @@ command -v samtools >/dev/null 2>&1 || { echo >&2 "I require samtools but it's n
 # pass paramters
 usage(){
 cat << EOF
-usage: ${0##*/} [-h] [-f FASTQ1] [-r FASTQ2] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
+usage: ${0##*/} [-h] [-f FASTQ1] [-r FASTQ2] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
 
 Map and processing Hi-C reads
 (1) map two ends using BWA;
@@ -22,21 +22,28 @@ Map and processing Hi-C reads
 	iii) if pair is "DIFFERENT-STRAND", keep it if insert size > 10000 (default) 
 (6) Remove PCR duplication;
 
+Example:
+	bash bin/hicmap.sh -t 20 -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -n JL_H4 -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c data/mm9.MboI.500bp -m 1000
+
 Options:    
 	-h, --help      	show this help message and exit.
-	-f FASTQ1       	First mate of pair-end sequencing data.
-	-r FASTQ1       	Second mate of pair-end sequencing data.
+	-t THREADS			threads [1].
+	-f FASTQ1       	first mate of pair-end sequencing data.
+	-r FASTQ1       	second mate of pair-end sequencing data.
+	-n NAME            	prefix of output files.
 	-g BWA_GENOME   	BWA indexed reference genome.
-	-c CUT_ENZ      	Restriction cutting enzyme files. 
-	-m MIN_INSERT_SIZE	Min insert size for valid "DIFFERENT-STRAND" pairs.
+	-c CUT_ENZ      	restriction cutting enzyme files. 
+	-m MIN_INSERT_SIZE	min insert size for valid "DIFFERENT-STRAND" pairs.
 EOF
 } 
 
-while getopts ":f:r:g:c:m:" opt;
+while getopts ":t:f:r:n:g:c:m:" opt;
 do
 	case "$opt" in
+		t) THREADS=$OPTARG;;
 		f) FASTQ1=$OPTARG;;
 		r) FASTQ2=$OPTARG;;
+		n) PREFIX=$OPTARG;;
 		g) GENOME=$OPTARG;;
 		c) CUT_ENZ=$OPTARG;;
 		m) MIN_INSERT_SIZE=$OPTARG;;
@@ -46,9 +53,15 @@ do
 	esac
 done
 
-if [ $# -lt 12 ] ; then
+if [ $# -lt 10 ] ; then
    usage
-   echo "error: too few arguments, at least 3 arguments"
+   echo "error: too few arguments"
+   exit 1
+fi
+
+re='^[0-9]+$'
+if ! [[ $THREADS =~ $re ]] ; then
+   echo "error: '$THREADS' Not a number" >&2; 
    exit 1
 fi
 
@@ -71,9 +84,15 @@ if [ ! -f $GENOME ]; then
 	exit 1
 fi
 
-if [ ! -f $CUT_ENZ ]; then
+if [ ! -f $CUT_ENZ.neg.merged.bed ]; then
 	usage
-    echo "error: '$CUT_ENZ' not exists.";
+    echo "error: '$CUT_ENZ.neg.merged.bed' not exists.";
+	exit 1
+fi
+
+if [ ! -f $CUT_ENZ.pos.merged.bed ]; then
+	usage
+    echo "error: '$CUT_ENZ.pos.merged.bed' not exists.";
 	exit 1
 fi
 
@@ -84,35 +103,39 @@ if ! [[ $MIN_INSERT_SIZE =~ $re ]] ; then
    exit 1
 fi
 
-#MINLOOPSIZE=10000
-#
-#cd $DIR
-#
-#if [ "$CUT" == "Hind3" ]
+
+#echo "Step1. Mapping reads and filter non-uniquely and secondary alignment" 
+#if [ ${FASTQ1: -4} == ".bz2" ];
 #then
-#	CUT_INTERVAL=$HIND3
-#fi
-#if [ "$CUT" == "MboI" ]
-#then
-#	CUT_INTERVAL=$MBOI
+#	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ1) | samtools view -F 2048 -q 10 -bS - >$PREFIX\_R1.uniq.bam
+#else
+#	bwa mem -t $THREADS $GENOME $FASTQ1 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_R1.uniq.bam
 #fi
 #
-#echo "DIR="$DIR > hicmap.log
-#echo "PREFIX="$PREFIX >> hicmap.log
-#echo "MINLOOPSIZE="$MINLOOPSIZE >> hicmap.log
-#echo "MAPPER="$BWA >> hicmap.log
-#echo "REFERENCE="$MM9_BWA >> hicmap.log
-#echo "CUT="$CUT_INTERVAL >> hicmap.log
-#echo >> hicmap.log
+#if [ ${FASTQ2: -4} == ".bz2" ];
+#then
+#	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ2) | samtools view -F 2048 -q 10 -bS - > $PREFIX\_R2.uniq.bam
+#else
+#	bwa mem -t $THREADS $GENOME $FASTQ2 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_R2.uniq.bam
+#fi
 #
-#echo "Step1. Mapping reads and filter non-uniquely and secondary alignment" >> hicmap.log
-#$BWA mem -t $THREADS $MM9_BWA <(bzip2 -dc $FASTQ1) | $SAMTOOLS view -F 2048 -q 10 -bS - > $PREFIX\_R1.bam
-#$BWA mem -t $THREADS $MM9_BWA <(bzip2 -dc $FASTQ2) | $SAMTOOLS view -F 2048 -q 10 -bS - > $PREFIX\_R2.bam
-#
-#$SAMTOOLS flagstat $PREFIX\_R1.bam > $PREFIX\_R1.bam.flagstat &
-#$SAMTOOLS flagstat $PREFIX\_R2.bam > $PREFIX\_R2.bam.flagstat &
-#
-#echo "Step2. Filter reads that are far from restriction cutter sites"  >> hicmap.log
+#samtools flagstat $PREFIX\_R1.uniq.bam > $PREFIX\_R1.uniq.bam.flagstat &
+#samtools flagstat $PREFIX\_R2.uniq.bam > $PREFIX\_R2.uniq.bam.flagstat &
+
+echo "Step2. Filter reads that are far from restriction cutter sites" 
+mkdir $PREFIX\_tmp
+# positive strand
+samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam 
+samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam 
+
+# negative strand
+samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
+samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
+
+# merge both strands
+samtools cat -o $PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
+samtools cat -o $PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
+
 #$SAMTOOLS view -b -L $CUT_INTERVAL $PREFIX\_R1.bam > $PREFIX\_R1.filtered.bam
 #sleep 10m
 #$SAMTOOLS view -b -L $CUT_INTERVAL $PREFIX\_R2.bam > $PREFIX\_R2.filtered.bam
@@ -154,6 +177,3 @@ fi
 #echo "Total usable read pairs:" >> hicmap.log
 #$SAMTOOLS index $PREFIX.merged.sorted.paired.sorted.nodup.bam 
 #$SAMTOOLS view $PREFIX.merged.sorted.paired.sorted.nodup.bam | wc -l >> hicmap.log 
-#
-#
-#

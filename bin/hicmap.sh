@@ -23,30 +23,35 @@ Map and processing Hi-C reads
 (6) Remove PCR duplication;
 
 Example:
-	bash bin/hicmap.sh -t 20 -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -n JL_H4 -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c data/mm9.MboI.500bp -m 1000
+	bash bin/hicmap.sh -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -n JL_H4 -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
 
 Options:    
 	-h, --help      	show this help message and exit.
-	-t THREADS			threads [1].
-	-f FASTQ1       	first mate of pair-end sequencing data.
-	-r FASTQ1       	second mate of pair-end sequencing data.
-	-n NAME            	prefix of output files.
-	-g BWA_GENOME   	BWA indexed reference genome.
-	-c CUT_ENZ      	restriction cutting enzyme files. 
-	-m MIN_INSERT_SIZE	min insert size for valid "DIFFERENT-STRAND" pairs.
+	-t  THREADS			threads [1].
+	-m  MAX_MEM			max memory usage [4G].
+	-f  FASTQ1       	first mate of pair-end sequencing data.
+	-r  FASTQ1       	second mate of pair-end sequencing data.
+	-n  NAME      		prefix of output files.
+	-g  BWA_GENOME   	BWA indexed reference genome.
+	-c  CUT_ENZ      	restriction cutting enzyme files. 
+	-d  MIN_INSERT_SIZE	min insert size for valid "DIFFERENT-STRAND" pairs.
 EOF
 } 
 
-while getopts ":t:f:r:n:g:c:m:" opt;
+THREADS=1
+MAX_MEM="4G"
+
+while getopts ":t:m:f:r:n:g:c:d:" opt;
 do
 	case "$opt" in
 		t) THREADS=$OPTARG;;
+		m) MAX_MEM=$OPTARG;;
 		f) FASTQ1=$OPTARG;;
 		r) FASTQ2=$OPTARG;;
 		n) PREFIX=$OPTARG;;
 		g) GENOME=$OPTARG;;
 		c) CUT_ENZ=$OPTARG;;
-		m) MIN_INSERT_SIZE=$OPTARG;;
+		d) MIN_INSERT_SIZE=$OPTARG;;
 		\?) usage
 			exit 1
 			;;
@@ -122,20 +127,25 @@ fi
 #samtools flagstat $PREFIX\_R1.uniq.bam > $PREFIX\_R1.uniq.bam.flagstat &
 #samtools flagstat $PREFIX\_R2.uniq.bam > $PREFIX\_R2.uniq.bam.flagstat &
 
-echo "Step2. Filter reads that are far from restriction cutter sites" 
-mkdir $PREFIX\_tmp
-# positive strand
-samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam 
-samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam 
+#echo "Step2. Filter reads that are  > 500bp far from restriction cutter sites" 
+#mkdir $PREFIX\_tmp
+## positive strand
+#samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam 
+#samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam 
+#
+## negative strand
+#samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
+#samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
+#
+## merge both strands
+#samtools cat -o $PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
+#samtools cat -o $PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
 
-# negative strand
-samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
-samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
+echo "Step3. Sorting reads based on read names" 
+#samtools sort -n $PREFIX\_R1.uniq.filtered.bam $PREFIX\_R1.uniq.filtered.sorted 
+#samtools sort -n $PREFIX\_R2.uniq.filtered.bam $PREFIX\_R2.uniq.filtered.sorted 
 
-# merge both strands
-samtools cat -o $PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
-samtools cat -o $PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
-
+echo "Step3. Sorting reads based on read names" 
 #$SAMTOOLS view -b -L $CUT_INTERVAL $PREFIX\_R1.bam > $PREFIX\_R1.filtered.bam
 #sleep 10m
 #$SAMTOOLS view -b -L $CUT_INTERVAL $PREFIX\_R2.bam > $PREFIX\_R2.filtered.bam

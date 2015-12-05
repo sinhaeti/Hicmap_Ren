@@ -10,31 +10,26 @@ cat << EOF
 usage: ${0##*/} [-h] [-f FASTQ1] [-r FASTQ2] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
 
 Map and processing Hi-C reads
-(1) map two ends using BWA;
+(1) map FASTQ1/FASTQ2 using BWA indepedently;
 (2) filter reads with MAPQ < 10;
-(3) filter reads fell 500bp outside restriction enzyme cutter sites;
+(3) filter reads fell >500bp far from restriction enzyme cutter sites (strand sensitive);
 (4) sort reads by read names;
-(5) pair up two ends: 
-	i)   if pair is "SAME-STRAND" reads on "+" strand, keep reads only if they are 
-	     within 500bp upstream of closest cutter sites;
-   	ii)  if pair is "SAME-STRAND" reads on "_" strand, keep reads only if they are 
-   	     within 500bp downstream of closest cutter sites;
-	iii) if pair is "DIFFERENT-STRAND", keep it if insert size > 10000 (default) 
-(6) Remove PCR duplication;
+(5) pair up two ends and filter invalid hic pairs;
+(6) Remove PCR duplication using Picard - markDuplicates;
 
 Example:
 	bash bin/hicmap.sh -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -n JL_H4 -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
 
 Options:    
-	-h, --help      	show this help message and exit.
+	-h, --help			show this help message and exit.
 	-t  THREADS			threads [1].
 	-m  MAX_MEM			max memory usage [4G].
-	-f  FASTQ1       	first mate of pair-end sequencing data.
-	-r  FASTQ1       	second mate of pair-end sequencing data.
-	-n  NAME      		prefix of output files.
-	-g  BWA_GENOME   	BWA indexed reference genome.
-	-c  CUT_ENZ      	restriction cutting enzyme files. 
-	-d  MIN_INSERT_SIZE	min insert size for valid "DIFFERENT-STRAND" pairs.
+	-f  FASTQ1			first mate of pair-end sequencing data.
+	-r  FASTQ2			second mate of pair-end sequencing data.
+	-n  NAME			prefix of output files.
+	-g  BWA_GENOME			BWA indexed reference genome.
+	-c  CUT_ENZ			restriction cutting enzyme files. 
+	-d  MIN_INSERT_SIZE		min insert size for valid "DIFFERENT-STRAND" pairs.
 EOF
 } 
 
@@ -109,7 +104,7 @@ if ! [[ $MIN_INSERT_SIZE =~ $re ]] ; then
 fi
 
 
-#echo "Step1. Mapping reads and filter non-uniquely and secondary alignment" 
+#echo "Step1. map reads then filter non-uniquely and secondary alignment" 
 #if [ ${FASTQ1: -4} == ".bz2" ];
 #then
 #	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ1) | samtools view -F 2048 -q 10 -bS - >$PREFIX\_R1.uniq.bam
@@ -127,7 +122,7 @@ fi
 #samtools flagstat $PREFIX\_R1.uniq.bam > $PREFIX\_R1.uniq.bam.flagstat &
 #samtools flagstat $PREFIX\_R2.uniq.bam > $PREFIX\_R2.uniq.bam.flagstat &
 
-#echo "Step2. Filter reads that are  > 500bp far from restriction cutter sites" 
+#echo "Step2. filter reads that are  > 500bp far from restriction cutter sites" 
 #mkdir $PREFIX\_tmp
 ## positive strand
 #samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam 
@@ -141,11 +136,11 @@ fi
 #samtools cat -o $PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
 #samtools cat -o $PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
 
-echo "Step3. Sorting reads based on read names" 
+echo "Step3. sort reads based on read names" 
 #samtools sort -n $PREFIX\_R1.uniq.filtered.bam $PREFIX\_R1.uniq.filtered.sorted 
 #samtools sort -n $PREFIX\_R2.uniq.filtered.bam $PREFIX\_R2.uniq.filtered.sorted 
 
-echo "Step3. Sorting reads based on read names" 
+echo "Step4. pair up two ends" 
 #$SAMTOOLS view -b -L $CUT_INTERVAL $PREFIX\_R1.bam > $PREFIX\_R1.filtered.bam
 #sleep 10m
 #$SAMTOOLS view -b -L $CUT_INTERVAL $PREFIX\_R2.bam > $PREFIX\_R2.filtered.bam

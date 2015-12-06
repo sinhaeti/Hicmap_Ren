@@ -27,6 +27,30 @@ char* strrev(char *s){
 	return s;
 }
 
+static int strnum_cmp(const char *_a, const char *_b)
+{
+    const unsigned char *a = (const unsigned char*)_a, *b = (const unsigned char*)_b;
+    const unsigned char *pa = a, *pb = b;
+    while (*pa && *pb) {
+        if (isdigit(*pa) && isdigit(*pb)) {
+            while (*pa == '0') ++pa;
+            while (*pb == '0') ++pb;
+            while (isdigit(*pa) && isdigit(*pb) && *pa == *pb) ++pa, ++pb;
+            if (isdigit(*pa) && isdigit(*pb)) {
+                int i = 0;
+                while (isdigit(pa[i]) && isdigit(pb[i])) ++i;
+                return isdigit(pa[i])? 1 : isdigit(pb[i])? -1 : (int)*pa - (int)*pb;
+            } else if (isdigit(*pa)) return 1;
+            else if (isdigit(*pb)) return -1;
+            else if (pa - a != pb - b) return pa - a < pb - b? 1 : -1;
+        } else {
+            if (*pa != *pb) return (int)*pa - (int)*pb;
+            ++pa; ++pb;
+        }
+    }
+    return *pa? 1 : *pb? -1 : 0;
+}
+
 const int get_read_idx(const bam1_t *b) {
     return !(b->core.flag & BAM_FREAD1);
 }
@@ -161,7 +185,6 @@ void pairUp(opt_t *opt){
 	if(in1 == NULL) die("bam_parser: fail to open file '%s'", opt->input1);
 	if(in2 == NULL) die("bam_parser: fail to open file '%s'", opt->input2);
 	
-	// if output file exists but not force to overwrite
 	if(access(opt->output, F_OK)!=-1 && opt->f==false) die("pairUp: %s exists, use opetion -f to overwrite", opt->output);
 	bam_hdr_t *header1 = sam_hdr_read(in1);
 	bam_hdr_t *header2 = sam_hdr_read(in2);
@@ -172,26 +195,31 @@ void pairUp(opt_t *opt){
 	int8_t *p;
 	int32_t n;
 	int ret1, ret2;
+
 	ret1=sam_read1(in1, header1, aln1);
 	ret2=sam_read1(in2, header2, aln2);
 	
 	kstring_t *name1 = mycalloc(1, kstring_t); 
 	kstring_t *name2 = mycalloc(1, kstring_t); 
+
+	name1->s = get_pair_name(aln1); name1->l = strlen(name1->s);
+	name2->s = get_pair_name(aln2); name2->l = strlen(name2->s);
+	
 	while (ret1 >= 0 && ret2 >= 0){
 		name1->s = get_pair_name(aln1); name1->l = strlen(name1->s);
 		name2->s = get_pair_name(aln2); name2->l = strlen(name2->s);
-		if(strcmp(name1->s, name2->s) < 0){
+		if(strnum_cmp(name1->s, name2->s) < 0){
 			ret1=sam_read1(in1, header1, aln1);
 		}
-		else if(strcmp(name1->s, name2->s) == 0){
-			printf("%s\t%s\t%d\n", name1->s, name2->s, strcmp(name1->s, name2->s));
+		else if(strnum_cmp(name1->s, name2->s) == 0){
+			printf("%s\t%s\n", name1->s, name2->s);		
 			ret1=sam_read1(in1, header1, aln1);
-			ret2=sam_read1(in2, header2, aln2);		
-		}else{
 			ret2=sam_read1(in2, header2, aln2);
 		}
-	}
-	
+		else if(strnum_cmp(name1->s, name2->s) > 0){
+			ret2=sam_read1(in2, header2, aln2);
+		}
+	}	
 	bam_destroy1(aln1);
 	bam_destroy1(aln2);
 	sam_close(in1);

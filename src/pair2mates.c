@@ -98,7 +98,8 @@ char* get_qualities(const bam1_t *b) {
     size_t len = b->core.l_qseq;
     char* quality;
 	quality = mycalloc(len, char);
-    for (size_t i=0; i<len; i++) {
+	size_t i;
+    for (i=0; i<len; i++) {
 		quality[i] = (char)((int)qual[i] + 33);
     }
 	if (b->core.flag & BAM_FREVERSE)
@@ -122,14 +123,12 @@ int get_lane_id(const bam1_t *b){
 static int usage()
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "Program: bam2fastq (convert bam to fastq file)\n");
+	fprintf(stderr, "Program: pair2mates (pair up two mates of Hi-C)\n");
 	fprintf(stderr, "Version: %s\n", PACKAGE_VERSION);
 	fprintf(stderr, "Contact: Rongxin Fang <r3fang@ucsd.edu>\n\n");
-	fprintf(stderr, "Usage:   bam2fastq [options] <in.sam>\n\n");
-	fprintf(stderr, "Options: -o FILENAME   Specifies the name of the FASTQ file(s) that will be generated\n");
-	fprintf(stderr, "         -f            overwriting existing files if necessary\n");
-	fprintf(stderr, "         -a            Reads in the BAM that are aligned will not be extracted\n");
-	fprintf(stderr, "         -u            Reads in the BAM that are not aligned will not be extracted\n");
+	fprintf(stderr, "Usage:   pair2mates [options] <R1.bam> <R2.bam>\n\n");
+	fprintf(stderr, "Options: -o FILENAME   Specifies the name of output file (e.g. name.paired.bam)\n");
+	fprintf(stderr, "         -d            Min distance for valid pairs [10000]\n");
 	fprintf(stderr, "\n");
 	return 1;
 }
@@ -137,39 +136,68 @@ static int usage()
 // DP matrix
 typedef struct {
 	bool f;
-	bool a;
-	bool u;
-	char* in_name;	
-	char* out_name;
+	char* input1;	
+	char* input2;
+	char* output;
+	int dist;	
 } opt_t;
 
 void init_opt(opt_t *s){
 	s->f = false;
-	s->a = false;
-	s->u = false;
+	s->dist = 10000;
 }
 
 void opt_destory(opt_t *s){
-	free(s->in_name);
-	free(s->out_name);
+	free(s->input1);
+	free(s->input2);
+	free(s->output);
 	free(s);
 }
 
-void bam_parser(opt_t *opt){
-	samFile *in = sam_open(opt->in_name, "r");
-	if(in == NULL) die("bam_parser: fail to open file '%s'", opt->in_name);
+void pairUp(opt_t *opt){
+	samFile *in1 = sam_open(opt->input1, "r");
+	samFile *in2 = sam_open(opt->input2, "r");
+
+	if(in1 == NULL) die("bam_parser: fail to open file '%s'", opt->input1);
+	if(in2 == NULL) die("bam_parser: fail to open file '%s'", opt->input2);
+	
 	// if output file exists but not force to overwrite
-	if(access(opt->out_name, F_OK)!=-1 && opt->f==false) die("bam_parser: %s exists, use opetion -f to overwrite", opt->out_name);
-	bam_hdr_t *header = sam_hdr_read(in);
-	bam1_t *aln = bam_init1();
+	if(access(opt->output, F_OK)!=-1 && opt->f==false) die("pairUp: %s exists, use opetion -f to overwrite", opt->output);
+	bam_hdr_t *header1 = sam_hdr_read(in1);
+	bam_hdr_t *header2 = sam_hdr_read(in2);
+
+	bam1_t *aln1 = bam_init1();
+	bam1_t *aln2 = bam_init1();
+	
 	int8_t *p;
 	int32_t n;
-	int ret;
-	while((ret=sam_read1(in, header, aln)) >= 0)
-		printf("name=%s\nflag=%d\nseq=%s\nqual=%s\nlane_id=%d\n", get_read_name(aln), aln->core.flag, get_sequence(aln), get_qualities(aln), get_lane_id(aln));
-
-	bam_destroy1(aln);
-	sam_close(in);
+	int ret1, ret2;
+	ret1=sam_read1(in1, header1, aln1);
+	ret2=sam_read1(in2, header2, aln2);
+	
+	kstring_t *name1 = mycalloc(1, kstring_t); 
+	kstring_t *name2 = mycalloc(1, kstring_t); 
+	while (ret1 >= 0 && ret2 >= 0){
+		name1->s = get_pair_name(aln1); name1->l = strlen(name1->s);
+		name2->s = get_pair_name(aln2); name2->l = strlen(name2->s);
+		if(strcmp(name1->s, name2->s) < 0){
+			ret1=sam_read1(in1, header1, aln1);
+		}
+		else if(strcmp(name1->s, name2->s) == 0){
+			printf("%s\t%s\t%d\n", name1->s, name2->s, strcmp(name1->s, name2->s));
+			ret1=sam_read1(in1, header1, aln1);
+			ret2=sam_read1(in2, header2, aln2);		
+		}else{
+			ret2=sam_read1(in2, header2, aln2);
+		}
+	}
+	
+	bam_destroy1(aln1);
+	bam_destroy1(aln2);
+	sam_close(in1);
+	sam_close(in2);
+	free(name1);
+	free(name2);
 }
 
 int main(int argc, char *argv[]){
@@ -177,17 +205,18 @@ int main(int argc, char *argv[]){
 	int c;
 	opt_t *opt = mycalloc(1, opt_t);
 	init_opt(opt);
-	while ((c = getopt (argc, argv, "fauo:")) != -1){
+	while ((c = getopt (argc, argv, "f:o:m:")) != -1){
 		switch(c){
 			case 'f': opt->f = true; break;
-			case 'a': opt->a = true; break;
-			case 'u': opt->u = true; break;
-			case 'o': opt->out_name = strdup(optarg); break;
+			case 'o': opt->output = strdup(optarg); break;
+			case 'm': opt->dist = atoi(optarg); break;
 			default: return 1;
 		}
 	}
-	opt->in_name = strdup(argv[argc-1]);
-	bam_parser(opt);
+	opt->input1 = strdup(argv[argc-2]);
+	opt->input2 = strdup(argv[argc-1]);
+	printf("%s\t%d\t%s\t%s\n", opt->output, opt->dist, opt->input1, opt->input2);
+	pairUp(opt);
 	opt_destory(opt);
 	return 0;
 }

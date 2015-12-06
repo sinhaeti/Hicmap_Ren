@@ -3,4 +3,5 @@ data/JL_H4_R2.fastq.bz2
 data/mm9.MboI.500bp.neg.merged.bed
 data/mm9.MboI.500bp.pos.merged.bed
 *.bam
+*.sam
 *.bam.flagstat

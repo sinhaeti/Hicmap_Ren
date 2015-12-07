@@ -18,7 +18,7 @@ Map and processing Hi-C reads
 (6) Remove PCR duplication using Picard - markDuplicates;
 
 Example:
-	bash bin/hicmap.sh -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -n JL_H4 -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
+	bash scripts/hicmap.sh -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -n JL_H4 -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
 
 Options:    
 	-h, --help			show this help message and exit.
@@ -141,32 +141,14 @@ echo "Step3. sort reads based on read names"
 #samtools sort -n $PREFIX\_R2.uniq.filtered.bam $PREFIX\_R2.uniq.filtered.sorted 
 
 echo "Step4. pair up two ends" 
-#$SAMTOOLS view -b -L $CUT_INTERVAL $PREFIX\_R1.bam > $PREFIX\_R1.filtered.bam
-#sleep 10m
-#$SAMTOOLS view -b -L $CUT_INTERVAL $PREFIX\_R2.bam > $PREFIX\_R2.filtered.bam
-#
-#$SAMTOOLS flagstat $PREFIX\_R1.filtered.bam > $PREFIX\_R1.filtered.bam.flagstat &
-#$SAMTOOLS flagstat $PREFIX\_R2.filtered.bam > $PREFIX\_R2.filtered.bam.flagstat &
-#
-#echo "Step3. Merge two mates"  >> hicmap.log
-#$SAMTOOLS cat -o $PREFIX.merged.bam $PREFIX\_R1.filtered.bam $PREFIX\_R2.filtered.bam
-#
-#echo "Step4. Sort by read names"  >> hicmap.log
-#$SAMTOOLS sort -m 10G -n $PREFIX.merged.bam $PREFIX.merged.sorted
-#rm $PREFIX.merged.bam 
-#
-#echo "Step5. Pair two mates up and filter read pairs with small distance"  >> hicmap.log
-#$SAMTOOLS view $PREFIX.merged.sorted.bam | python $PAIR2MATES $MINLOOPSIZE - > $PREFIX.merged.sorted.paired.sam
-#
-#echo "Step6. Convert to bam file and sort by genomic coordiantes"  >> hicmap.log
-#$SAMTOOLS view -bS -ht $FAI $PREFIX.merged.sorted.paired.sam | \
-#	$SAMTOOLS sort -m 10G - $PREFIX.merged.sorted.paired.sorted
-#
-#$SAMTOOLS flagstat $PREFIX.merged.sorted.paired.sorted.bam > $PREFIX.merged.sorted.paired.sorted.bam.flagstat &
-#
+pair2mates -m 15000 -o $PREFIX.filtered.paired.bam $PREFIX\_R1.filtered.sorted.bam $PREFIX\_R2.filtered.sorted.bam
+
+echo "Step4. sort based on genomic coordinates" 
+samtools sort -m $MAX_MEM $PREFIX.filtered.paired.bam $PREFIX.filtered.paired.sorted
+
 #echo "Step7. Filter PCR duplication"  >> hicmap.log
 #java -Xmx10g -jar $MARK_DUPLICATE INPUT=$PREFIX.merged.sorted.paired.sorted.bam OUTPUT=$PREFIX.merged.sorted.paired.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
-#
+
 #$SAMTOOLS flagstat $PREFIX.merged.sorted.paired.sorted.nodup.bam > $PREFIX.merged.sorted.paired.sorted.nodup.bam.flagstat &
 #
 #echo "Total Input:" >> hicmap.log

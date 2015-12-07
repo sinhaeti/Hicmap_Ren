@@ -229,14 +229,16 @@ void pairUp(opt_t *opt){
 			ret1=sam_read1(in1, header1, aln1);
 		}
 		else if(strnum_cmp(name1->s, name2->s) == 0){
-			if(strcmp(header2->target_name[aln2->core.tid],  header2->target_name[aln2->core.tid])==0 && abs(aln1->core.pos - aln2->core.pos) > opt->dist){
+			if(strcmp(header1->target_name[aln1->core.tid],  header2->target_name[aln2->core.tid])==0 && abs(aln1->core.pos - aln2->core.pos) > opt->dist){
 				aln1->core.flag = 83;
+				aln1->core.mtid = aln1->core.tid;				
 				aln1->core.mpos = aln2->core.pos;
-				aln1->core.isize = aln1->core.pos - aln2->core.pos;
+				aln1->core.isize = aln2->core.pos - aln1->core.pos;
 				
-				aln2->core.flag = 163;				
+				aln2->core.flag = 163;			
+				aln2->core.mtid = aln2->core.tid;	
 				aln2->core.mpos = aln1->core.pos;
-				aln2->core.isize = aln2->core.pos - aln1->core.pos;
+				aln2->core.isize =  aln1->core.pos - aln2->core.pos;
 
 				bam_write1(out, aln1);
 				bam_write1(out, aln2);

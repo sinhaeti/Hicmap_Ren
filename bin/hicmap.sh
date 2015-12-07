@@ -18,7 +18,7 @@ Map and processing Hi-C reads
 (6) Remove PCR duplication using Picard - markDuplicates;
 
 Example:
-	bash scripts/hicmap.sh -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -p scripts/MarkDuplicates.jar -n JL_H4 -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
+	bash bin/hicmap.sh -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -p scripts/MarkDuplicates.jar -n JL_H4 -g /oasis/tscc/scratch/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
 
 Options:    
 	-h, --help			show this help message and exit.
@@ -26,7 +26,7 @@ Options:
 	-m  MAX_MEM			max memory usage [4G].
 	-f  FASTQ1			first mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
 	-r  FASTQ2			second mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
-	-p	MARK_DUPLICATE	path to picard MarkDuplicates.jar
+	-p  MARK_DUPLICATE  		path to picard MarkDuplicates.jar
 	-n  NAME			prefix of output files.
 	-g  BWA_GENOME			BWA indexed reference genome.
 	-c  CUT_ENZ			restriction cutting enzyme files. 
@@ -105,51 +105,51 @@ if ! [[ $MIN_INSERT_SIZE =~ $re ]] ; then
    exit 1
 fi
 
+mkdir $PREFIX\_tmp
 
-#echo "Step1. map reads then filter non-uniquely and secondary alignment" 
-#if [ ${FASTQ1: -4} == ".bz2" ];
-#then
-#	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ1) | samtools view -F 2048 -q 10 -bS - >$PREFIX\_R1.uniq.bam
-#else
-#	bwa mem -t $THREADS $GENOME $FASTQ1 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_R1.uniq.bam
-#fi
-#
-#if [ ${FASTQ2: -4} == ".bz2" ];
-#then
-#	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ2) | samtools view -F 2048 -q 10 -bS - > $PREFIX\_R2.uniq.bam
-#else
-#	bwa mem -t $THREADS $GENOME $FASTQ2 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_R2.uniq.bam
-#fi
-#
-#samtools flagstat $PREFIX\_R1.uniq.bam > $PREFIX\_R1.uniq.bam.flagstat &
-#samtools flagstat $PREFIX\_R2.uniq.bam > $PREFIX\_R2.uniq.bam.flagstat &
+echo "Step1. map reads then filter non-uniquely and secondary alignment" 
+if [ ${FASTQ1: -4} == ".bz2" ];
+then
+	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ1) | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam
+else
+	bwa mem -t $THREADS $GENOME $FASTQ1 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam
+fi
 
-#echo "Step2. filter reads that are  > 500bp far from restriction cutter sites" 
-#mkdir $PREFIX\_tmp
-## positive strand
-#samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam 
-#samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam 
-#
-## negative strand
-#samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
-#samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
-#
-## merge both strands
-#samtools cat -o $PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
-#samtools cat -o $PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
+if [ ${FASTQ2: -4} == ".bz2" ];
+then
+	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ2) | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam
+else
+	bwa mem -t $THREADS $GENOME $FASTQ2 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam
+fi
 
-echo "Step3. sort reads based on read names" 
-samtools sort -n $PREFIX\_R1.uniq.filtered.bam $PREFIX\_R1.uniq.filtered.sorted 
-samtools sort -n $PREFIX\_R2.uniq.filtered.bam $PREFIX\_R2.uniq.filtered.sorted 
+samtools flagstat $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam.flagstat &
+samtools flagstat $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam.flagstat &
+
+echo "Step2. filter reads that are  > 500bp far from restriction cutter sites" 
+# positive strand
+samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam 
+samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam 
+
+# negative strand
+samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
+samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
+
+# merge both strands
+samtools cat -o $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
+samtools cat -o $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
+
+echo "Step3. sort reads by read names" 
+samtools sort -n $PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
+samtools sort -n $PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
 
 echo "Step4. pair up two ends" 
-pair2mates -m $MIN_INSERT_SIZE -o $PREFIX.filtered.paired.bam $PREFIX\_R1.filtered.sorted.bam $PREFIX\_R2.filtered.sorted.bam
+pair2mates -m $MIN_INSERT_SIZE -o $PREFIX\_tmp/$PREFIX.filtered.paired.bam $PREFIX\_tmp/$PREFIX\_R1.filtered.sorted.bam $PREFIX\_tmp/$PREFIX\_R2.filtered.sorted.bam
 
 echo "Step5. sort based on genomic coordinates" 
-samtools sort -m $MAX_MEM $PREFIX.filtered.paired.bam $PREFIX.filtered.paired.sorted
+samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.filtered.paired.bam $PREFIX\_tmp/$PREFIX.filtered.paired.sorted
 
 echo "Step6. Filter PCR duplication"
-java -Xmx10g -jar $MARK_DUPLICATE INPUT=$PREFIX.merged.sorted.paired.sorted.bam OUTPUT=$PREFIX.merged.sorted.paired.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
+java -Xmx10g -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.filtered.paired.sorted.bam OUTPUT=$PREFIX.filtered.paired.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
 
 #$SAMTOOLS flagstat $PREFIX.merged.sorted.paired.sorted.nodup.bam > $PREFIX.merged.sorted.paired.sorted.nodup.bam.flagstat &
 #

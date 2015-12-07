@@ -7,7 +7,11 @@ command -v samtools >/dev/null 2>&1 || { echo >&2 "I require samtools but it's n
 # pass paramters
 usage(){
 cat << EOF
-usage: ${0##*/} [-h] [-t THREADS] [-m MAX_MEM] [-f FASTQ1] [-r FASTQ2] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
+
+Program: hicmap (Hi-C analysis pipeline)
+Version: 12.05-r15
+Contact: Rongxin Fang <r3fang@ucsd.edu>
+Lab: http://bioinformatics-renlab.ucsd.edu/rentrac/
 
 Map and processing Hi-C reads
 (1) indepedently map FASTQ1/FASTQ2 using BWA;
@@ -16,8 +20,10 @@ Map and processing Hi-C reads
 (4) pair up two ends and filter invalid hic pairs;
 (5) remove PCR duplication using Picard - MarkDuplicates;
 
+usage: ${0##*/} [-h] [-t THREADS] [-m MAX_MEM] [-f FASTQ1] [-r FASTQ2] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
+
 Example:
-	bash bin/hicmap.sh -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -p bin/MarkDuplicates.jar -n JL_H4 -g BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
+hicmap -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -p bin/MarkDuplicates.jar -n JL_H4 -g BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
 
 Options:    
 	-h, --help			show this help message and exit.

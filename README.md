@@ -11,14 +11,14 @@ $ hicmap -t 2 -m 3G -d 1000 -f data/JL_H4_R1.fastq.bz2 -r  -n JL_H4 data/JL_H4_R
 ##Depedency
 - samtools 1.2+
 - bwa
-- Picards
+- picards (MarkDuplicates.jar)
 
 ##Introduction
 
 **Hicmap** is a simple but efficient and fast pipeline for analyzing Hi-C data which includes alignment, reads filtering and heatmap generation.
 
 ```
-$./bin/hicmap
+$ bash /bin/hicmap
 
 usage: hicmap.sh [-h] [-t THREADS] [-m MAX_MEM] [-f FASTQ1] [-r FASTQ2] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
 
@@ -38,11 +38,11 @@ Options:
 	-m  MAX_MEM			max memory usage [4G].
 	-f  FASTQ1			first mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
 	-r  FASTQ2			second mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
-	-p  MARK_DUPLICATE  		path to picard MarkDuplicates.jar
+	-p  MARK_DUPLICATE  path to picard MarkDuplicates.jar
 	-n  NAME			prefix of output files.
-	-g  BWA_GENOME			BWA indexed reference genome.
+	-g  BWA_GENOME		BWA indexed reference genome.
 	-c  CUT_ENZ			restriction cutting enzyme files. 
-	-d  MIN_INSERT_SIZE		min insert size for valid "DIFFERENT-STRAND" pairs.
+	-d  MIN_INSERT_SIZE	min insert size for valid "DIFFERENT-STRAND" pairs.
 ```
 
 ##Version     

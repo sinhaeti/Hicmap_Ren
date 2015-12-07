@@ -50,6 +50,10 @@ Options:
 	-d  MIN_INSERT_SIZE		min insert size for valid "DIFFERENT-STRAND" pairs.
 ```
 
+## Workflow
+
+![workflow](https://github.com/r3fang/Hicmap_Ren/blob/master/img/workflow.jpg)
+
 ##Version     
 12.05-15
 

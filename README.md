@@ -1,6 +1,6 @@
 ##Get Started     
 ```
-$ git clone https://github.com/r3fang/Hicmap_Ren.git
+$ git clone --recursive https://github.com/r3fang/Hicmap_Ren.git
 $ cd Hicmap_Ren
 $ bash install.sh
 $ PATH=$PATH:/path/to/Hicmap_Ren/bin
@@ -9,16 +9,16 @@ $ hicmap -t 2 -m 3G -d 1000 -f data/JL_H4_R1.fastq.bz2 -r  -n JL_H4 data/JL_H4_R
 ```
 
 ##Depedency
-- samtools 1.2+
-- bwa
-- picards (MarkDuplicates.jar)
+- [samtools 1.2+](http://www.htslib.org/doc/samtools.html)
+- [bwa](https://github.com/lh3/bwa)
+- [Picard](http://broadinstitute.github.io/picard/)
 
 ##Introduction
 
 **Hicmap** is a simple but efficient and fast pipeline for analyzing Hi-C data which includes alignment, reads filtering and heatmap generation.
 
 ```
-$ bash /bin/hicmap
+$ bash bin/hicmap
 
 usage: hicmap.sh [-h] [-t THREADS] [-m MAX_MEM] [-f FASTQ1] [-r FASTQ2] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
 
@@ -30,7 +30,7 @@ Map and processing Hi-C reads
 (5) Remove PCR duplication using Picard - MarkDuplicates;
 
 Example:
-	 hicmap -t 2 -m 3G -d 1000 -f data/JL_H4_R1.fastq.bz2 -r  -n JL_H4 data/JL_H4_R2.fastq.bz2 -p bin/MarkDuplicates.jar -g BWAIndex/genome.fa -c data/mm9.MboI.500bp 
+hicmap -t 2 -m 3G -d 1000 -f data/JL_H4_R1.fastq.bz2 -r  -n JL_H4 data/JL_H4_R2.fastq.bz2 -p bin/MarkDuplicates.jar -g BWAIndex/genome.fa -c data/mm9.MboI.500bp 
 
 Options:    
 	-h, --help			show this help message and exit.

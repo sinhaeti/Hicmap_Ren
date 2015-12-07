@@ -4,6 +4,8 @@
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
 #include "htslib/kstring.h"
+#include "htslib/kseq.h"
+#include "htslib/bgzf.h"
 #include "utils.h"
 #include <unistd.h>
 #ifndef PACKAGE_VERSION
@@ -26,6 +28,7 @@ char* strrev(char *s){
 	s[l] = '\0';
 	return s;
 }
+
 
 static int strnum_cmp(const char *_a, const char *_b)
 {
@@ -71,7 +74,7 @@ const char* get_sequence(const bam1_t *b){
 	if(b == NULL) die("get_sequence: parameter error\n");
 	const uint8_t *seq = bam_get_seq(b);
 	size_t len = b->core.l_qseq;
-	char* sequence;
+	char* sequence="";
 	sequence = malloc(len*sizeof(char));
 	uint8_t offset = (b->core.flag & BAM_FREVERSE) ? 16 : 0;
     size_t i; for (i=0; i<len; i++) {
@@ -120,7 +123,7 @@ const char* get_sequence(const bam1_t *b){
 char* get_qualities(const bam1_t *b) {
     const uint8_t *qual = bam_get_qual(b);
     size_t len = b->core.l_qseq;
-    char* quality;
+    char* quality="";
 	quality = mycalloc(len, char);
 	size_t i;
     for (i=0; i<len; i++) {
@@ -157,7 +160,21 @@ static int usage()
 	return 1;
 }
 
+static char *get_cigar_str(const bam1_t *b){
+	uint32_t *cigar = bam_get_cigar(b);
+	char* str1 = mycalloc(30, char);
+	strcpy(str1, "");
+	char buf[10];
+	int k;
+	for (k = 0; k < b->core.n_cigar; ++k){
+	    if (bam_cigar_type(bam_cigar_op(cigar[k]))&1)
+			sprintf(buf, "%d%c", bam_cigar_oplen(cigar[k]), bam_cigar_opchr(cigar[k]));
+			strcat(str1, buf);
+	}
+	return str1;
+}
 // DP matrix
+
 typedef struct {
 	bool f;
 	char* input1;	
@@ -181,11 +198,13 @@ void opt_destory(opt_t *s){
 void pairUp(opt_t *opt){
 	samFile *in1 = sam_open(opt->input1, "r");
 	samFile *in2 = sam_open(opt->input2, "r");
-
-	if(in1 == NULL) die("bam_parser: fail to open file '%s'", opt->input1);
-	if(in2 == NULL) die("bam_parser: fail to open file '%s'", opt->input2);
+	BGZF *out = bgzf_open(opt->output, "w");
 	
-	if(access(opt->output, F_OK)!=-1 && opt->f==false) die("pairUp: %s exists, use opetion -f to overwrite", opt->output);
+	if(in1 == NULL) die("pairUp: fail to open file '%s'", opt->input1);
+	if(in2 == NULL) die("pairUp: fail to open file '%s'", opt->input2);
+	if(out == NULL) die("pairUp: fail to open file '%s'", opt->output);
+	
+	//if(access(opt->output, F_OK)!=-1 && opt->f==false) die("pairUp: %s exists, use opetion -f to overwrite", opt->output);
 	bam_hdr_t *header1 = sam_hdr_read(in1);
 	bam_hdr_t *header2 = sam_hdr_read(in2);
 
@@ -201,9 +220,7 @@ void pairUp(opt_t *opt){
 	
 	kstring_t *name1 = mycalloc(1, kstring_t); 
 	kstring_t *name2 = mycalloc(1, kstring_t); 
-
-	name1->s = get_pair_name(aln1); name1->l = strlen(name1->s);
-	name2->s = get_pair_name(aln2); name2->l = strlen(name2->s);
+	bam_hdr_write(out, header1);
 	
 	while (ret1 >= 0 && ret2 >= 0){
 		name1->s = get_pair_name(aln1); name1->l = strlen(name1->s);
@@ -212,7 +229,19 @@ void pairUp(opt_t *opt){
 			ret1=sam_read1(in1, header1, aln1);
 		}
 		else if(strnum_cmp(name1->s, name2->s) == 0){
-			printf("%s\t%s\n", name1->s, name2->s);		
+			if(strcmp(header2->target_name[aln2->core.tid],  header2->target_name[aln2->core.tid])==0 && abs(aln1->core.pos - aln2->core.pos) > opt->dist){
+				aln1->core.flag = 83;
+				aln1->core.mpos = aln2->core.pos;
+				aln1->core.isize = aln1->core.pos - aln2->core.pos;
+				
+				aln2->core.flag = 163;				
+				aln2->core.mpos = aln1->core.pos;
+				aln2->core.isize = aln2->core.pos - aln1->core.pos;
+
+				bam_write1(out, aln1);
+				bam_write1(out, aln2);
+			}			
+			// 83/163
 			ret1=sam_read1(in1, header1, aln1);
 			ret2=sam_read1(in2, header2, aln2);
 		}
@@ -224,6 +253,7 @@ void pairUp(opt_t *opt){
 	bam_destroy1(aln2);
 	sam_close(in1);
 	sam_close(in2);
+	if ( bgzf_close(out)<0 ) error("Close failed\n");
 	free(name1);
 	free(name2);
 }
@@ -233,9 +263,8 @@ int main(int argc, char *argv[]){
 	int c;
 	opt_t *opt = mycalloc(1, opt_t);
 	init_opt(opt);
-	while ((c = getopt (argc, argv, "f:o:m:")) != -1){
+	while ((c = getopt (argc, argv, "o:m:")) != -1){
 		switch(c){
-			case 'f': opt->f = true; break;
 			case 'o': opt->output = strdup(optarg); break;
 			case 'm': opt->dist = atoi(optarg); break;
 			default: return 1;
@@ -243,7 +272,6 @@ int main(int argc, char *argv[]){
 	}
 	opt->input1 = strdup(argv[argc-2]);
 	opt->input2 = strdup(argv[argc-1]);
-	printf("%s\t%d\t%s\t%s\n", opt->output, opt->dist, opt->input1, opt->input2);
 	pairUp(opt);
 	opt_destory(opt);
 	return 0;

@@ -2,6 +2,12 @@ data/JL_H4_R1.fastq.bz2
 data/JL_H4_R2.fastq.bz2
 data/mm9.MboI.500bp.neg.merged.bed
 data/mm9.MboI.500bp.pos.merged.bed
+data/hg19.Hind3.500bp.neg.merged.bed
+data/hg19.Hind3.500bp.pos.merged.bed
+data/mm9.Hind3.500bp.neg.merged.bed
+data/mm9.Hind3.500bp.pos.merged.bed
+
 *.bam
 *.sam
 *.bam.flagstat
+metrics.*.txt

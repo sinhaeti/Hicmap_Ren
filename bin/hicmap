@@ -110,42 +110,42 @@ if ! [[ $MIN_INSERT_SIZE =~ $re ]] ; then
    exit 1
 fi
 
-mkdir $PREFIX\_tmp
+#mkdir $PREFIX\_tmp
 
-echo "Step1. map reads then filter non-uniquely and secondary alignment" 
-if [ ${FASTQ1: -4} == ".bz2" ];
-then
-	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ1) | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam
-else
-	bwa mem -t $THREADS $GENOME $FASTQ1 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam
-fi
-
-if [ ${FASTQ2: -4} == ".bz2" ];
-then
-	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ2) | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam
-else
-	bwa mem -t $THREADS $GENOME $FASTQ2 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam
-fi
-
-samtools flagstat $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam.flagstat &
-samtools flagstat $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam.flagstat &
-
-echo "Step2. filter reads that are  > 500bp far from restriction cutter sites" 
-# positive strand
-samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam 
-samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam 
-
-# negative strand
-samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
-samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
-
-# merge both strands
-samtools cat -o $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
-samtools cat -o $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
+#echo "Step1. map reads then filter non-uniquely and secondary alignment" 
+#if [ ${FASTQ1: -4} == ".bz2" ];
+#then
+#	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ1) | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam
+#else
+#	bwa mem -t $THREADS $GENOME $FASTQ1 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam
+#fi
+#
+#if [ ${FASTQ2: -4} == ".bz2" ];
+#then
+#	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ2) | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam
+#else
+#	bwa mem -t $THREADS $GENOME $FASTQ2 | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam
+#fi
+#
+#samtools flagstat $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam.flagstat &
+#samtools flagstat $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam.flagstat &
+#
+#echo "Step2. filter reads that are  > 500bp far from restriction cutter sites" 
+## positive strand
+#samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam 
+#samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam 
+#
+## negative strand
+#samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
+#samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
+#
+## merge both strands
+#samtools cat -o $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam 
+#samtools cat -o $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam 
 
 echo "Step3. sort reads by read names" 
-samtools sort -n $PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
-samtools sort -n $PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
+samtools sort -n $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
+samtools sort -n $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
 
 echo "Step4. pair up two ends" 
 pair2mates -m $MIN_INSERT_SIZE -o $PREFIX\_tmp/$PREFIX.filtered.paired.bam $PREFIX\_tmp/$PREFIX\_R1.filtered.sorted.bam $PREFIX\_tmp/$PREFIX\_R2.filtered.sorted.bam

@@ -7,18 +7,17 @@ command -v samtools >/dev/null 2>&1 || { echo >&2 "I require samtools but it's n
 # pass paramters
 usage(){
 cat << EOF
-usage: ${0##*/} [-h] [-f FASTQ1] [-r FASTQ2] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
+usage: ${0##*/} [-h] [-t THREADS] [-m MAX_MEM] [-f FASTQ1] [-r FASTQ2] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
 
 Map and processing Hi-C reads
-(1) map FASTQ1/FASTQ2 using BWA indepedently;
+(1) indepedently map FASTQ1/FASTQ2 using BWA;
 (2) filter reads with MAPQ < 10;
-(3) filter reads fell >500bp far from restriction enzyme cutter sites (strand sensitive);
-(4) sort reads by read names;
-(5) pair up two ends and filter invalid hic pairs;
-(6) Remove PCR duplication using Picard - markDuplicates;
+(3) filter reads far from restriction enzyme cutter sites (500bp upstream for + strand/500 downstream for - strand);
+(4) pair up two ends and filter invalid hic pairs;
+(5) remove PCR duplication using Picard - MarkDuplicates;
 
 Example:
-	bash bin/hicmap.sh -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -p scripts/MarkDuplicates.jar -n JL_H4 -g /oasis/tscc/scratch/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
+	bash bin/hicmap.sh -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -p bin/MarkDuplicates.jar -n JL_H4 -g BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
 
 Options:    
 	-h, --help			show this help message and exit.
@@ -26,7 +25,7 @@ Options:
 	-m  MAX_MEM			max memory usage [4G].
 	-f  FASTQ1			first mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
 	-r  FASTQ2			second mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
-	-p  MARK_DUPLICATE  		path to picard MarkDuplicates.jar
+	-p  MARK_DUPLICATE  		path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
 	-n  NAME			prefix of output files.
 	-g  BWA_GENOME			BWA indexed reference genome.
 	-c  CUT_ENZ			restriction cutting enzyme files. 
@@ -150,19 +149,3 @@ samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.filtered.paired.bam $PREFIX\_tmp/
 
 echo "Step6. Filter PCR duplication"
 java -Xmx10g -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.filtered.paired.sorted.bam OUTPUT=$PREFIX.filtered.paired.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
-
-#$SAMTOOLS flagstat $PREFIX.merged.sorted.paired.sorted.nodup.bam > $PREFIX.merged.sorted.paired.sorted.nodup.bam.flagstat &
-#
-#echo "Total Input:" >> hicmap.log
-#bzip2 -dc $FASTQ1 | wc -l >> hicmap.log
-#echo "Uniquely mapped for R1:" >> hicmap.log
-#$SAMTOOLS view $PREFIX\_R1.bam | wc -l >> hicmap.log
-#echo "Uniquely mapped for R2:" >> hicmap.log
-#$SAMTOOLS view $PREFIX\_R2.bam | wc -l >> hicmap.log
-#echo "Closed to cutter sites for R1:" >> hicmap.log
-#$SAMTOOLS view $PREFIX\_R1.filtered.bam | wc -l >> hicmap.log
-#echo "Closed to cutter sites for R2:" >> hicmap.log
-#$SAMTOOLS view $PREFIX\_R2.filtered.bam | wc -l >> hicmap.log
-#echo "Total usable read pairs:" >> hicmap.log
-#$SAMTOOLS index $PREFIX.merged.sorted.paired.sorted.nodup.bam 
-#$SAMTOOLS view $PREFIX.merged.sorted.paired.sorted.nodup.bam | wc -l >> hicmap.log 

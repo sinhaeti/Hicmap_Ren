@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # test if softwares installed
-command -v bwa >/dev/null 2>&1 || { echo >&2 "I require bwa but it's not installed.  Aborting."; exit 1; }
-command -v samtools >/dev/null 2>&1 || { echo >&2 "I require samtools but it's not installed.  Aborting."; exit 1; }
+command -v bwa >/dev/null 2>&1 || { echo >&2 "hicmap requires bwa but it's not installed.  Aborting."; exit 1; }
+command -v samtools >/dev/null 2>&1 || { echo >&2 "hicmap requires samtools but it's not installed.  Aborting."; exit 1; }
 
 # pass paramters
 usage(){
@@ -148,9 +148,13 @@ rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam
 rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam
 rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam
 
+samtools flagstat $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam.flagstat &
+samtools flagstat $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam.flagstat &
+
 echo "Step3. sort reads by read names" 
 samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
 samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
+
 rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam
 rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam
 
@@ -160,9 +164,9 @@ pair2mates -m $MIN_INSERT_SIZE -o $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam 
 echo "Step5. sort based on genomic coordinates" 
 samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted
 rm $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam
+samtools flagstat $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam > $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam.flagstat &
 
 echo "Step6. Filter PCR duplication"
 java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam OUTPUT=$PREFIX.uniq.filtered.paired.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
-
-
+samtools flagstat $PREFIX.uniq.filtered.paired.sorted.nodup.bam > $PREFIX.uniq.filtered.paired.sorted.nodup.bam.flagstat
 

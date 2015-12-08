@@ -3,9 +3,8 @@
 $ git clone --recursive https://github.com/r3fang/Hicmap_Ren.git
 $ cd Hicmap_Ren
 $ bash install.sh
-$ PATH=$PATH:/path/to/Hicmap_Ren/bin
-$ export PATH
-$ hicmap -t 2 -m 3G -d 1000 -f data/JL_H4_R1.fastq.bz2 -r  -n JL_H4 data/JL_H4_R2.fastq.bz2 -p bin/MarkDuplicates.jar -g BWAIndex/genome.fa -c data/mm9.MboI.500bp 
+$ export PATH=$PATH:/path/to/Hicmap_Ren/bin
+$ hicmap -t 2 -m 3G -d 1000 -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -n JL_H4 -p bin/MarkDuplicates.jar -g BWAIndex/genome.fa -c data/mm9.MboI.500bp 
 ```
 
 ##Depedency

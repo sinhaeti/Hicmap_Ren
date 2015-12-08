@@ -53,6 +53,15 @@ Options:
 
 ![workflow](https://github.com/r3fang/Hicmap_Ren/blob/master/img/workflow.jpg)
 
+## FAQ
+
+ 1. **What is Hi-C?**     
+ 2. **Why BWA is chosen as default aligner?**
+ 3. **What other aligners could be used for aligning Hi-C reads?**
+ 4. **What does each parameter mean?**
+ 5. **How does hicmap deal with chimeric reads?**
+ 6. **What is valid pairs for Hi-C?** 
+
 ##Version     
 12.05-15
 

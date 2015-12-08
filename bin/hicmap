@@ -111,8 +111,9 @@ if ! [[ $MIN_INSERT_SIZE =~ $re ]] ; then
 fi
 
 mkdir $PREFIX\_tmp
-
+echo "Starting now"
 echo "Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 
+date
 
 #mkfifo R1.fifo
 #mkfifo R2.fifo
@@ -143,12 +144,10 @@ samtools flagstat $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.u
 samtools flagstat $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam.flagstat &
 
 echo "Step2. filter reads that are  > 500bp far from restriction cutter sites" 
+date
 # positive strand
 samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam &
 samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam &
-wait
-
-# negative strand
 samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
 samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
 wait
@@ -157,6 +156,7 @@ wait
 samtools cat -o $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
 samtools cat -o $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
 wait
+date
 
 rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam
 rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam
@@ -172,16 +172,20 @@ samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\
 
 rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam
 rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam
+date
 
 echo "Step4. pair up two ends" 
 pair2mates -m $MIN_INSERT_SIZE -o $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam
+date
 
 echo "Step5. sort based on genomic coordinates" 
 samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted
 rm $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam
 samtools flagstat $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam > $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam.flagstat &
+date
 
 echo "Step6. Filter PCR duplication"
 java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam OUTPUT=$PREFIX.uniq.filtered.paired.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
 samtools flagstat $PREFIX.uniq.filtered.paired.sorted.nodup.bam > $PREFIX.uniq.filtered.paired.sorted.nodup.bam.flagstat
+date
 

@@ -9,9 +9,9 @@ $ hicmap -t 2 -m 3G -d 1000 -f data/JL_H4_R1.fastq.bz2 -r  -n JL_H4 data/JL_H4_R
 ```
 
 ##Depedency
-- [samtools 1.2+](http://www.htslib.org/doc/samtools.html)
-- [bwa](https://github.com/lh3/bwa)
-- [Picard](http://broadinstitute.github.io/picard/)
+- [bwa](https://github.com/lh3/bwa) for mapping raw reads
+- [samtools 1.2+](http://www.htslib.org/doc/samtools.html) for sorting and piling up
+- [Picard](http://broadinstitute.github.io/picard/) for remove PCR duplication
 
 ##Introduction
 
@@ -38,16 +38,16 @@ Example:
 hicmap -t 20 -m 8G -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -p bin/MarkDuplicates.jar -n JL_H4 -g BWAIndex/genome.fa -c data/mm9.MboI.500bp -d 1000
 
 Options:    
-	-h, --help			show this help message and exit.
-	-t  THREADS			threads [1].
-	-m  MAX_MEM			max memory usage [4G].
-	-f  FASTQ1			first mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
-	-r  FASTQ2			second mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
-	-p  MARK_DUPLICATE  		path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
-	-n  NAME			prefix of output files.
-	-g  BWA_GENOME			BWA indexed reference genome.
-	-c  CUT_ENZ			restriction cutting enzyme files. 
-	-d  MIN_INSERT_SIZE		min insert size for valid "DIFFERENT-STRAND" pairs.
+	-h, --help			 show this help message and exit.
+	-t  THREADS			 threads [1].
+	-m  MAX_MEM			 max memory usage [4G].
+	-f  FASTQ1			 first mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
+	-r  FASTQ2			 second mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
+	-p  MARK_DUPLICATE   path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
+	-n  NAME			 prefix of output files.
+	-g  BWA_GENOME		 BWA indexed reference genome.
+	-c  CUT_ENZ			 restriction cutting enzyme files. 
+	-d  MIN_INSERT_SIZE	 min insert size for valid "DIFFERENT-STRAND" pairs.
 ```
 
 ## Workflow

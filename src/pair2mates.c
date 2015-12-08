@@ -232,7 +232,7 @@ void pairUp(opt_t *opt){
 			// if two mates mapped to the same chromosome
 			if(strcmp(header1->target_name[aln1->core.tid],  header2->target_name[aln2->core.tid])==0){
 				// if they are mapped to the same strand
-				if(aln1->core.flag == aln2->core.flag){
+				if(aln1->core.flag == 0 && aln2->core.flag == 0){
 					aln1->core.flag = 99;
 					aln1->core.mtid = aln1->core.tid;				
 					aln1->core.mpos = aln2->core.pos;
@@ -242,9 +242,33 @@ void pairUp(opt_t *opt){
 					aln2->core.mpos = aln1->core.pos;
 					aln2->core.isize =  aln1->core.pos - aln2->core.pos;
 					bam_write1(out, aln1);
-					bam_write1(out, aln2);					
-				}//if they are mapped to the different strand and far from each other
-				else if(aln1->core.flag != aln2->core.flag && abs(aln1->core.pos - aln2->core.pos) > opt->dist){
+					bam_write1(out, aln2);
+				}
+				if(aln1->core.flag == 16 && aln2->core.flag == 16){
+					aln1->core.flag = 83;
+					aln1->core.mtid = aln1->core.tid;				
+					aln1->core.mpos = aln2->core.pos;
+					aln1->core.isize = aln2->core.pos - aln1->core.pos;				
+					aln2->core.flag = 163;			
+					aln2->core.mtid = aln2->core.tid;	
+					aln2->core.mpos = aln1->core.pos;
+					aln2->core.isize =  aln1->core.pos - aln2->core.pos;
+					bam_write1(out, aln1);
+					bam_write1(out, aln2);
+				}
+				if(aln1->core.flag == 0 && aln2->core.flag == 16 && abs(aln1->core.pos - aln2->core.pos) > opt->dist){
+					aln1->core.flag = 99;
+					aln1->core.mtid = aln1->core.tid;				
+					aln1->core.mpos = aln2->core.pos;
+					aln1->core.isize = aln2->core.pos - aln1->core.pos;				
+					aln2->core.flag = 147;			
+					aln2->core.mtid = aln2->core.tid;	
+					aln2->core.mpos = aln1->core.pos;
+					aln2->core.isize =  aln1->core.pos - aln2->core.pos;
+					bam_write1(out, aln1);
+					bam_write1(out, aln2);
+				}
+				if(aln1->core.flag == 16 && aln2->core.flag == 0 && abs(aln1->core.pos - aln2->core.pos) > opt->dist){
 					aln1->core.flag = 83;
 					aln1->core.mtid = aln1->core.tid;				
 					aln1->core.mpos = aln2->core.pos;

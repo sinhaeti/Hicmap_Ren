@@ -2,7 +2,7 @@
 use strict;
 
 sub Log {
-  #print STDERR @_;
+  print STDERR @_;
 }
 
 sub MDist {
@@ -32,6 +32,13 @@ sub MDist {
   return $off;
 }
 
+sub Rm2048 {
+  my ($ln)=@_; chomp($ln);
+  my @data=split(/\t/, $ln);
+  $data[1]&=~2048;
+  return join("\t", @data);
+}
+
 sub FivePrime {
   my ($a, $b)=@_;
   my @As=split(/\t/, $a);
@@ -40,9 +47,9 @@ sub FivePrime {
   my $distB=MDist($Bs[1],$Bs[5]);
   Log "A/B: ".$distA." ".$distB."\n";
   if ($distA<$distB) {
-    return $a;
+    return Rm2048($a);
   }
-  return $b;
+  return Rm2048($b);
 }
 
 my ($prev_id, $prev_ln);

@@ -11,3 +11,5 @@ data/mm9.Hind3.500bp.pos.merged.bed
 *.sam
 *.bam.flagstat
 metrics.*.txt
+demo_tmp/
+chip_tmp/

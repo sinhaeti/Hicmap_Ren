@@ -6,6 +6,7 @@ command -v samtools >/dev/null 2>&1 || { echo >&2 "I require samtools but it's n
 command -v macs14 >/dev/null 2>&1 || { echo >&2 "I require macs14 but it's not installed.  Aborting."; exit 1; }
 command -v bedtools >/dev/null 2>&1 || { echo >&2 "I require bedtools but it's not installed.  Aborting."; exit 1; }
 command -v wigToBigWig >/dev/null 2>&1 || { echo >&2 "I require wigToBigWig but it's not installed.  Aborting."; exit 1; }
+command -v bedGraphToBigWig >/dev/null 2>&1 || { echo >&2 "I require bedGraphToBigWig but it's not installed.  Aborting."; exit 1; }
 
 usage(){
 cat << EOF
@@ -28,7 +29,7 @@ Options:
 	-p  MARK_DUPLICATE  		path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
 	-n  NAME			prefix of output files.
 	-g  BWA_GENOME			BWA indexed reference genome.
-	-s  GSIZE       		'mm' for mouse, 'hg' for human. 
+	-s  GSIZE       		'mm' for mouse, 'hs' for human. 
 	
 EOF
 } 
@@ -100,7 +101,7 @@ then
 	fi
 	if [ ${INPUT: -4} == ".bz2" ];
 	then
-		bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $INPUT) 2> $PREFIX\_tmp/$PREFIX.bwa.log |\
+		bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $INPUT) 2> $PREFIX\_tmp/$PREFIX.bwa.log | \
 			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam &
 	else
 		bwa mem -t $((THREADS/2)) $GENOME $INPUT 2> $PREFIX\_tmp/$PREFIX.bwa.log | \
@@ -117,18 +118,21 @@ then
 	java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/control.uniq.sorted.bam OUTPUT=$PREFIX\_tmp/control.uniq.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.ctr.txt TMP_DIR=$PREFIX\_tmp
 	
 	echo "call peaks"
-	macs14 -t $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam -c $PREFIX\_tmp/control.uniq.sorted.nodup.bam -f BAM -g $GSIZE -n $PREFIX 
+	macs14 --bdg -t $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam -c $PREFIX\_tmp/control.uniq.sorted.nodup.bam -f BAM -g $GSIZE -n $PREFIX 
+	
+	echo "convert bedgraph to bigwig"
+	#bedGraphToBigWig 
 else
 	echo "Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 
 	if [ ${INPUT: -4} == ".bz2" ];
 	then
 		bwa mem -t $THREADS $GENOME <(bzip2 -dc $INPUT) 2> $PREFIX\_tmp/$PREFIX.bwa.log |\
-			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam &
+			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam
 	else
 		bwa mem -t $THREADS $GENOME $INPUT 2> $PREFIX\_tmp/$PREFIX.bwa.log | \
-			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam &
+			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam
 	fi
-	wait
+
 	echo "sort reads based on genomic coordiantes"
 	samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.bam $PREFIX\_tmp/$PREFIX.uniq.sorted
 	
@@ -136,7 +140,7 @@ else
 	java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.bam OUTPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
 	
 	echo "call peaks"
-	macs14 -t $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam -f BAM -g $GSIZE -n $PREFIX 
+	macs14 --bdg -t $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam -f BAM -g $GSIZE -n $PREFIX 
 fi
 
 

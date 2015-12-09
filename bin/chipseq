@@ -1,0 +1,127 @@
+#!/bin/bash
+
+# test if softwares installed
+command -v bwa >/dev/null 2>&1 || { echo >&2 "I require bwa but it's not installed.  Aborting."; exit 1; }
+command -v samtools >/dev/null 2>&1 || { echo >&2 "I require samtools but it's not installed.  Aborting."; exit 1; }
+command -v macs14 >/dev/null 2>&1 || { echo >&2 "I require macs14 but it's not installed.  Aborting."; exit 1; }
+command -v bedtools >/dev/null 2>&1 || { echo >&2 "I require bedtools but it's not installed.  Aborting."; exit 1; }
+command -v wigToBigWig >/dev/null 2>&1 || { echo >&2 "I require wigToBigWig but it's not installed.  Aborting."; exit 1; }
+
+usage(){
+cat << EOF
+Program: chipseq (ChIP-seq analysis pipeline)
+Version: 12.09-r15
+Contact: Rongxin Fang <r3fang@ucsd.edu>
+Lab: http://bioinformatics-renlab.ucsd.edu/rentrac/
+
+usage: ${0##*/} [-h] [-t THREADS] [-m MAX_MEM] [-f INPUT.fastq] [-c CONTROL.fastq] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] 
+
+Example:
+chipseq -t 10 -m 8G -f demo_R1.fastq.bz2 -c control.fastq.bz2 -p Picard/MarkDuplicates.jar -n demo -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa
+
+Options:    
+	-h, --help			show this help message and exit.
+	-t  THREADS			threads [<5].
+	-m  MAX_MEM			max memory usage [<5GB].
+	-f  INPUT			treatment experiment file [.gz/fastq/fq/bz2].
+	-c  CONTROL			control experiment file [.gz/fastq/fq/bz2] - optional.
+	-p  MARK_DUPLICATE  		path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
+	-n  NAME			prefix of output files.
+	-g  BWA_GENOME			BWA indexed reference genome.
+	-k  KIND                	'hm' for histone modification, 'tf' for tfbs.
+	-s  GSIZE       		'mm' for mouse, 'hg' for human. 
+	
+EOF
+} 
+
+THREADS=1
+MAX_MEM="4G"
+
+while getopts ":t:m:f:c:p:n:g:k:s:" opt;
+do
+	case "$opt" in
+		t) THREADS=$OPTARG;;
+		m) MAX_MEM=$OPTARG;;
+		f) INPUT=$OPTARG;;
+		c) CONTROL=$OPTARG;;
+		p) MARK_DUPLICATE=$OPTARG;;
+		n) PREFIX=$OPTARG;;
+		g) GENOME=$OPTARG;;
+		k) TYPE=$OPTARG;;
+		s) GSIZE=$OPTARG;;
+		\?) usage
+			exit 1
+			;;
+	esac
+done
+
+echo THREADS=$THREADS
+echo MAX_MEM=$MAX_MEM 
+echo INPUT=$INPUT 
+echo CONTROL=$CONTROL 
+echo PREFIX=$PREFIX
+echo GENOME=$GENOME
+
+if [ $# -lt 14 ] ; then
+   usage
+   echo "error: too few arguments"
+   exit 1
+fi
+
+# check if input file exists
+if [ ! -f $MARK_DUPLICATE ]; then
+	usage
+    echo "error: '$MARK_DUPLICATE' not exists.";
+	exit 1
+fi
+
+if [ ! -f $INPUT ]; then
+	usage
+    echo "error: '$INPUT' not exists.";
+	exit 1
+fi
+
+if [ ! -f $GENOME ]; then
+	usage
+    echo "error: '$GENOME' not exists.";
+	exit 1
+fi
+
+mkdir $PREFIX\_tmp
+
+if [ ! -z "$CONTROL" ];
+then
+	echo "Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 
+	if [ ${CONTROL: -4} == ".bz2" ];
+	then
+		bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $CONTROL) 2> $PREFIX\_tmp/control.bwa.log |\
+			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/control.uniq.bam &
+	else
+		bwa mem -t $((THREADS/2)) $GENOME $INPUT 2> $PREFIX\_tmp/control.bwa.log | \
+			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/control.uniq.bam &
+	fi
+	if [ ${INPUT: -4} == ".bz2" ];
+	then
+		bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $INPUT) 2> $PREFIX\_tmp/$PREFIX.bwa.log |\
+			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam &
+	else
+		bwa mem -t $((THREADS/2)) $GENOME $INPUT 2> $PREFIX\_tmp/$PREFIX.bwa.log | \
+			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam &
+	fi
+
+	wait
+	echo "sort reads based on genomic coordiantes"
+	samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.bam $PREFIX\_tmp/$PREFIX.uniq.sorted
+	samtools sort -m $MAX_MEM $PREFIX\_tmp/control.uniq.bam $PREFIX\_tmp/control.uniq.sorted
+	
+	echo "remove PCR duplications"
+	java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.bam OUTPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
+	java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/control.uniq.sorted.bam OUTPUT=$PREFIX\_tmp/control.uniq.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.ctr.txt TMP_DIR=$PREFIX\_tmp
+	
+	echo "call peaks"
+	if [ TYPE == "tf" ];
+	then
+		macs14 -t $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.ba -c $PREFIX\_tmp/control.uniq.sorted.nodup.bam -f BAM -g $GSIZE -n $PREFIX -w 
+	fi
+fi
+

@@ -17,7 +17,7 @@ Lab: http://bioinformatics-renlab.ucsd.edu/rentrac/
 usage: ${0##*/} [-h] [-t THREADS] [-m MAX_MEM] [-f INPUT.fastq] [-c CONTROL.fastq] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] 
 
 Example:
-chipseq -t 10 -m 8G -f demo_R1.fastq.bz2 -c control.fastq.bz2 -p Picard/MarkDuplicates.jar -n demo -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa
+chipseq -t 10 -m 8G -f demo_R1.fastq.bz2 -c control.fastq.bz2 -p Picard/MarkDuplicates.jar -n demo -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -s mm
 
 Options:    
 	-h, --help			show this help message and exit.
@@ -28,7 +28,6 @@ Options:
 	-p  MARK_DUPLICATE  		path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
 	-n  NAME			prefix of output files.
 	-g  BWA_GENOME			BWA indexed reference genome.
-	-k  KIND                	'hm' for histone modification, 'tf' for tfbs.
 	-s  GSIZE       		'mm' for mouse, 'hg' for human. 
 	
 EOF
@@ -37,7 +36,7 @@ EOF
 THREADS=1
 MAX_MEM="4G"
 
-while getopts ":t:m:f:c:p:n:g:k:s:" opt;
+while getopts ":t:m:f:c:p:n:g:s:" opt;
 do
 	case "$opt" in
 		t) THREADS=$OPTARG;;
@@ -47,7 +46,6 @@ do
 		p) MARK_DUPLICATE=$OPTARG;;
 		n) PREFIX=$OPTARG;;
 		g) GENOME=$OPTARG;;
-		k) TYPE=$OPTARG;;
 		s) GSIZE=$OPTARG;;
 		\?) usage
 			exit 1
@@ -119,9 +117,26 @@ then
 	java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/control.uniq.sorted.bam OUTPUT=$PREFIX\_tmp/control.uniq.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.ctr.txt TMP_DIR=$PREFIX\_tmp
 	
 	echo "call peaks"
-	if [ TYPE == "tf" ];
+	macs14 -t $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam -c $PREFIX\_tmp/control.uniq.sorted.nodup.bam -f BAM -g $GSIZE -n $PREFIX 
+else
+	echo "Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 
+	if [ ${INPUT: -4} == ".bz2" ];
 	then
-		macs14 -t $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.ba -c $PREFIX\_tmp/control.uniq.sorted.nodup.bam -f BAM -g $GSIZE -n $PREFIX -w 
+		bwa mem -t $THREADS $GENOME <(bzip2 -dc $INPUT) 2> $PREFIX\_tmp/$PREFIX.bwa.log |\
+			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam &
+	else
+		bwa mem -t $THREADS $GENOME $INPUT 2> $PREFIX\_tmp/$PREFIX.bwa.log | \
+			samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam &
 	fi
+	wait
+	echo "sort reads based on genomic coordiantes"
+	samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.bam $PREFIX\_tmp/$PREFIX.uniq.sorted
+	
+	echo "remove PCR duplications"
+	java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.bam OUTPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
+	
+	echo "call peaks"
+	macs14 -t $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam -f BAM -g $GSIZE -n $PREFIX 
 fi
+
 

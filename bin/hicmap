@@ -112,7 +112,7 @@ fi
 
 mkdir $PREFIX\_tmp
 echo "Starting now"
-echo "Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 
+echo "Step1. map reads and filter non-uniquely mapped reads" 
 date
 
 #mkfifo R1.fifo

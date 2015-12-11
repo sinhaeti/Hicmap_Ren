@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # test if softwares installed
-command -v bwa >/dev/null 2>&1 || { echo >&2 "hicmap requires bwa but it's not installed.  Aborting."; exit 1; }
 command -v samtools >/dev/null 2>&1 || { echo >&2 "hicmap requires samtools but it's not installed.  Aborting."; exit 1; }
+command -v STAR >/dev/null 2>&1 || { echo >&2 "hicmap requires STAR but it's not installed.  Aborting."; exit 1; }
 
 # pass paramters
 usage(){
@@ -121,29 +121,36 @@ date
 #bwa mem .... > R2.fifo &
 #merge R1.fifo R2.fifo | samtools view -Sb - > output.bam 
 
-if [ ${FASTQ1: -4} == ".bz2" ];
-then
-	bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $FASTQ1) 2>$PREFIX\_tmp/$PREFIX\_R1.bwa.log | \
-		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam &
-else
-	bwa mem -t $((THREADS/2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX\_R1.bwa.log | \
-		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam &
-fi
+#if [ ${FASTQ1: -4} == ".bz2" ];
+#then
+#	STAR --genomeLoad LoadAndKeep --genomeDir /oasis/tscc/scratch/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/StarIndex/ --runThreadN 6 --readFilesIn J_Li/JL_H4_R2.fastq.bz2 --alignIntronMax 1000000 --readFilesCommand bzcat --outFileNamePrefix Demo 
+#	
+#else
+#	bwa mem -t $((THREADS/2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX\_R1.bwa.log | \
+#		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam &
+#fi
+#
+#if [ ${FASTQ2: -4} == ".bz2" ];
+#then
+#	bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $FASTQ2) 2>$PREFIX\_tmp/$PREFIX\_R2.bwa.log | \
+#		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam &
+#else
+#	bwa mem -t $((THREADS/2)) $GENOME $FASTQ2 2> $PREFIX\_tmp/$PREFIX\_R2.bwa.log | \
+#		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam &
+#fi
+#wait
 
-if [ ${FASTQ2: -4} == ".bz2" ];
-then
-	bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $FASTQ2) 2>$PREFIX\_tmp/$PREFIX\_R2.bwa.log | \
-		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam &
-else
-	bwa mem -t $((THREADS/2)) $GENOME $FASTQ2 2> $PREFIX\_tmp/$PREFIX\_R2.bwa.log | \
-		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam &
-fi
-wait
+STAR --genomeLoad LoadAndKeep --genomeDir /oasis/tscc/scratch/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/StarIndex/ --runThreadN 6 --readFilesIn $FASTQ1 --readFilesCommand bzcat --scoreGapGCAG -8 --alignIntronMax 2000000 --outFilterScoreMin 10 --outStd SAM | \
+	samtools view -q 10 -F 2048 -bS - >  $PREFIX\_tmp/$PREFIX\_R1.uniq.bam
+STAR --genomeLoad LoadAndKeep --genomeDir /oasis/tscc/scratch/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/StarIndex/ --runThreadN 6 --readFilesIn $FASTQ2 --readFilesCommand bzcat --scoreGapGCAG -8 --alignIntronMax 2000000 --outFilterScoreMin 10 --outStd SAM | \
+	samtools view -q 10 -F 2048 -bS - >  $PREFIX\_tmp/$PREFIX\_R2.uniq.bam
 
 samtools flagstat $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam.flagstat &
 samtools flagstat $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam.flagstat &
 
 echo "Step2. filter reads that are  > 500bp far from restriction cutter sites" 
+date
+# positive strand
 samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam &
 samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam &
 samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &

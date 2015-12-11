@@ -142,6 +142,7 @@ else
 	printf 'warning: %s_tmp/%s_R2.uniq.bam already exists.\n' "$PREFIX" "$PREFIX"
 fi
 wait
+
 echo 
 echo "$(date) Step2. filter reads that are  > 500bp far from restriction cutter sites" 
 if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam ]; then
@@ -209,34 +210,32 @@ else
 fi
 
 echo 
-echo "$(date) Step6. Summerizing ..."
+echo "$(date) Step7. Summerizing ..."
 if [ ${FASTQ1: -4} == ".bz2" ];
 then
-	TOTAL_READS=$(bzcat $FASTQ1 | wc -l | awk '{print $1}') &
+	TOTAL_READS=$(bzcat $FASTQ1 | wc -l | awk '{print $1}')
 elif [ ${FASTQ1: -4} == ".gz" ]
 then
-	TOTAL_READS=$(zcat $FASTQ1 | wc -l | awk '{print $1}') &
+	TOTAL_READS=$(zcat $FASTQ1 | wc -l | awk '{print $1}') 
 else
-	TOTAL_READS=$(wc -l $FASTQ1 | awk '{print $1}') &
+	TOTAL_READS=$(wc -l $FASTQ1 | awk '{print $1}') 
 fi
 
-UNIQ_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.bam | wc -l | awk '{print $1}') &
-UNIQ_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.bam | wc -l | awk '{print $1}') &
-UNIQ_FILTERED_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam | wc -l | awk '{print $1}') &
-UNIQ_FILTERED_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam | wc -l | awk '{print $1}') &
-UNIQ_FILTERED_PAIRED_READS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam | wc -l | awk '{print $1}') &
+UNIQ_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.bam | wc -l | awk '{print $1}') 
+UNIQ_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.bam | wc -l | awk '{print $1}') 
+UNIQ_FILTERED_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam | wc -l | awk '{print $1}') 
+UNIQ_FILTERED_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam | wc -l | awk '{print $1}')
+UNIQ_FILTERED_PAIRED_READS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam | wc -l | awk '{print $1}')
 UNIQ_FILTERED_PAIRED_NODUP_READS=$(samtools view $PREFIX.uniq.filtered.paired.sorted.nodup.bam | wc -l | awk '{print $1}') 
-#
-while [ -z "$TOTAL_READS" ] || [ -z "$UNIQ_READS_R1" ] || [ -z "$UNIQ_READS_R2" ] || [ -z "$UNIQ_FILTERED_READS_R1"] || [-z "$UNIQ_FILTERED_READS_R2"] || [ -z "$UNIQ_FILTERED_PAIRED_READS" ] || [ -z "$UNIQ_FILTERED_PAIRED_NODUP_READS" ];
-do
-	sleep 5s 
-done
+wait
 
+echo
 echo "================================ Summary =================================="
-echo "total number of reads = $TOTAL_READS"
+echo "total number of reads = $((TOTAL_READS/4))"
 echo "uniquely mapped reads (MAPQ>10) for R1=$UNIQ_READS_R1 and R2=$UNIQ_READS_R2"
 echo "500bp closed to cutter sites for R1=$UNIQ_FILTERED_READS_R1 and R2=$UNIQ_FILTERED_READS_R1"
-echo "cis-pair with min insert size $MIN_INSERT_SIZE = $UNIQ_FILTERED_PAIRED_READS"
-echo "After removing PCR duplication, left reads=$UNIQ_FILTERED_PAIRED_NODUP_READS"
+echo "cis-pair with min insert size $MIN_INSERT_SIZE = $((UNIQ_FILTERED_PAIRED_READS/2))"
+echo "After removing PCR duplication, left reads=$((UNIQ_FILTERED_PAIRED_NODUP_READS/2))"	
+
 
 

@@ -13,3 +13,6 @@ data/mm9.Hind3.500bp.pos.merged.bed
 metrics.*.txt
 demo_tmp/
 chip_tmp/
+*.err
+*.out
+*.Log

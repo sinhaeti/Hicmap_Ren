@@ -82,27 +82,6 @@ def main():
         mat[_pos1/bin_size][_pos2/bin_size] += 1
     fin.close()
     np.savetxt('chr3.mat', mat/2, delimiter='\t', fmt='%d')
-## counting the interaction between 2 bins
-#    map_dict = collections.defaultdict(int)
-#    for line in fin:
-#        if line.startswith("@"):
-#            next
-#        [_chr, _pos1, _pos2, _gap] = [line.split()[2], int(line.split()[3]), int(line.split()[7]), int(line.split()[8])]
-#        key = '\t'.join([_chr, str(_pos1/bin_size), str(_pos2/bin_size)])
-#        map_dict[key] += 1
-#
-## convert dict to list
-#    map_lst = []
-#    for key in map_dict:
-#       elems = key.split('\t')
-#       [_chr, _pos1, _pos2, _count] = [elems[0], int(elems[1]), int(elems[2]), int(map_dict[key])]
-#       map_lst.append([_chr, _pos1, _pos2, _count])
-#  
-## sort the list based on chr pos1 and pos2    
-#    map_lst_sorted = sorted(map_lst, key=operator.itemgetter(0, 1, 2))
-# 
-#    for elem in map_lst_sorted:
-#        print('\t'.join(map(str, elem)))
 
 if __name__ == '__main__':
     main()

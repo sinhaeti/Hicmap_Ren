@@ -19,5 +19,5 @@ MM9_HIND3="/oasis/tscc/scratch/r3fang/github/Hicmap_Ren/data/mm9.Hind3.500bp"
 MM9_MBOI="/oasis/tscc/scratch/r3fang/github/Hicmap_Ren/data/mm9.MboI.500bp"
 
 cd /oasis/tscc/scratch/r3fang/github/Hicmap_Ren
-hicmap -t 4 -m 8G -f data/demo_R1.fastq.bz2 -r data/demo_R2.fastq.bz2 -n demo_bwa -p $MARK_DUPLICATE -g $MM9_BWA -c $MM9_MBOI -d 10000 > hicmap.demo_bwa.Log
+hicmap -t 4 -m 2G -f data/demo_R1.fastq.bz2 -r data/demo_R2.fastq.bz2 -n demo_bwa -p $MARK_DUPLICATE -g $MM9_BWA -c $MM9_MBOI -d 10000
 

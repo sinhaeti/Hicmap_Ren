@@ -6,23 +6,27 @@ import os.path
 import collections
 import operator 
 import numpy as np
-import pysam
 
 def main():
     
     # get arguments from user
     parser = optparse.OptionParser(description='Extract interactions from one anchor.', 
-                                   usage='%prog [-h] [-i INPUT] [-s BSIZE] [-c CHR] [-l start] [-r right]')
+                                   usage='%prog [-h] [-i INPUT] [-s BSIZE] [-g GSIZE] [-c CHR] [-l LEFT] [-r RIGHT]')
 
     parser.add_option('-i',
                       dest="INPUT",
-                      help='Pair-end sam/bam file sorted by cooridantes (stdin supported).'
+                      help='Pair-end sam file sorted by cooridantes (stdin supported).'
                       )
    
     parser.add_option('-s',
                       dest="BSIZE", 
                       type=int,
                       help='Bin size.'
+                      )
+
+    parser.add_option('-g',
+                      dest="GSIZE", 
+                      help='Genome size e.g. hg19.fa.fai.'
                       )
 
     parser.add_option('-c',
@@ -49,6 +53,8 @@ def main():
                       )
                       
     options, remainder = parser.parse_args()
+    left = options.LEFT
+    right = options.RIGHT
     
     bin_size = 40000
     if options.BSIZE:
@@ -56,9 +62,9 @@ def main():
 
     if not options.CHROM:
         parser.print_help()
-        exit('error: too few arguments, missing CHROM')
-    
+        exit('error: too few arguments, missing CHROM')    
     chrom = options.CHROM
+
     if not options.GSIZE:
         parser.print_help()
         exit('error: too few arguments, missing GSIZE')
@@ -72,44 +78,25 @@ def main():
     if not infile:
         parser.print_help()
         exit('error: too few arguments, missing INPUT')
-
+    
 	if infile != "-" and not os.path.isfile(infile): exit("error: \'%s\' not exist" % infile);
-    
-    if infile != "-" and os.path.isfile(infile): fin = open(infile);
-	
+    if infile != "-" and os.path.isfile(infile): fin = open(infile, "r") 	
     if infile == "-": fin = sys.stdin
-    
     max_bin_num = (genome_size[chrom]/bin_size + 1)
-    mat = np.zeros((max_bin_num, max_bin_num))
-        
+    mat = np.zeros((max_bin_num, max_bin_num), dtype=np.int)    
+
+    # counting the interaction between 2 bins
     for line in fin:
         if line.startswith("@"):
             next
-        [_pos1, _pos2, _gap] = [int(line.split()[3]), int(line.split()[7]), int(line.split()[8])]
-        mat[_pos1/bin_size][_pos2/bin_size] += 1
-    fin.close()
-    np.savetxt('chr3.mat', mat/2, delimiter='\t', fmt='%d')
-## counting the interaction between 2 bins
-#    map_dict = collections.defaultdict(int)
-#    for line in fin:
-#        if line.startswith("@"):
-#            next
-#        [_chr, _pos1, _pos2, _gap] = [line.split()[2], int(line.split()[3]), int(line.split()[7]), int(line.split()[8])]
-#        key = '\t'.join([_chr, str(_pos1/bin_size), str(_pos2/bin_size)])
-#        map_dict[key] += 1
-#
-## convert dict to list
-#    map_lst = []
-#    for key in map_dict:
-#       elems = key.split('\t')
-#       [_chr, _pos1, _pos2, _count] = [elems[0], int(elems[1]), int(elems[2]), int(map_dict[key])]
-#       map_lst.append([_chr, _pos1, _pos2, _count])
-#  
-## sort the list based on chr pos1 and pos2    
-#    map_lst_sorted = sorted(map_lst, key=operator.itemgetter(0, 1, 2))
-# 
-#    for elem in map_lst_sorted:
-#        print('\t'.join(map(str, elem)))
-
+        [_chr1, _pos1, _chr2, _pos2, _gap] = [line.split()[2], int(line.split()[3]), line.split()[6], int(line.split()[7]), int(line.split()[8])]
+        if _chr1 == chrom and _chr2 == "=":
+            mat[_pos1/bin_size][_pos2/bin_size] += 1
+    mat = mat/2
+    arr = np.sum(mat[left/bin_size: ((right/bin_size) + 1)], axis=0)
+    arr[left/bin_size: ((right/bin_size) + 1)] = 0
+    for i in xrange(arr.shape[0]-1):
+        print "\t".join([chrom, str(i*bin_size), str((i+1)*bin_size), str(arr[i])])
+    
 if __name__ == '__main__':
     main()

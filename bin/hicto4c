@@ -1,4 +1,4 @@
-#!/bin/python
+#!/opt/python/bin/python
 # extract all interactions from one loci
 import sys
 import optparse
@@ -82,21 +82,24 @@ def main():
 	if infile != "-" and not os.path.isfile(infile): exit("error: \'%s\' not exist" % infile);
     if infile != "-" and os.path.isfile(infile): fin = open(infile, "r") 	
     if infile == "-": fin = sys.stdin
-    max_bin_num = (genome_size[chrom]/bin_size + 1)
-    mat = np.zeros((max_bin_num, max_bin_num), dtype=np.int)    
-
+    num_col = (genome_size[chrom]/bin_size + 1)
+    num_row = right/bin_size - left/bin_size + 1
+    mat = np.zeros((num_row, num_col), dtype=np.int)    
+    
     # counting the interaction between 2 bins
     for line in fin:
         if line.startswith("@"):
             next
         [_chr1, _pos1, _chr2, _pos2, _gap] = [line.split()[2], int(line.split()[3]), line.split()[6], int(line.split()[7]), int(line.split()[8])]
         if _chr1 == chrom and _chr2 == "=":
-            mat[_pos1/bin_size][_pos2/bin_size] += 1
+            if _pos1/bin_size in range(left/bin_size, ((right/bin_size) + 1)):
+                mat[_pos1/bin_size - left/bin_size][_pos2/bin_size] += 1
     mat = mat/2
-    arr = np.sum(mat[left/bin_size: ((right/bin_size) + 1)], axis=0)
+    arr = np.sum(mat, axis=0)
     arr[left/bin_size: ((right/bin_size) + 1)] = 0
     for i in xrange(arr.shape[0]-1):
-        print "\t".join([chrom, str(i*bin_size), str((i+1)*bin_size), str(arr[i])])
+        if arr[i] > 0:
+            print "\t".join([chrom, str(i*bin_size), str((i+1)*bin_size), str(arr[i])])
     
 if __name__ == '__main__':
     main()

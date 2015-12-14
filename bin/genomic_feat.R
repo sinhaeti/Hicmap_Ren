@@ -70,6 +70,3 @@ write.table(as.data.frame(res), file = "genomicFeatures.mm9.MboI.5k.bed", append
                  col.names = FALSE, qmethod = c("escape", "double"),
                  fileEncoding = "")
 				 
-
-
-# step 3. count effective length for each segment

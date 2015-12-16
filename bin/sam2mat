@@ -1,4 +1,4 @@
-#!/bin/python
+#!/opt/python/bin/python
 # convert hi-c sam file to interaction maps
 
 import sys
@@ -34,6 +34,11 @@ def main():
                       dest="GSIZE", 
                       help='Genome size.'
                       )
+
+    parser.add_option('-m',
+                      dest="MIN_COUNT", 
+                      help='Min Count.'
+                      )
                       
     parser.add_option('--version',
                       dest="version",
@@ -43,15 +48,20 @@ def main():
                       
     options, remainder = parser.parse_args()
     
-    bin_size = 40000
+    bin_size = 5000
     if options.BSIZE:
         bin_size = options.BSIZE
 
     if not options.CHROM:
         parser.print_help()
-        exit('error: too few arguments, missing CHROM')
-    
+        exit('error: too few arguments, missing CHROM')    
     chrom = options.CHROM
+
+    if not options.MIN_COUNT:
+        min_count = 3
+    else:
+        min_count = int(options.MIN_COUNT)
+
     if not options.GSIZE:
         parser.print_help()
         exit('error: too few arguments, missing GSIZE')
@@ -74,14 +84,17 @@ def main():
     
     max_bin_num = (genome_size[chrom]/bin_size + 1)
     mat = np.zeros((max_bin_num, max_bin_num))
-        
+    print "#", "Bin_Size="+str(bin_size)        
     for line in fin:
         if line.startswith("@"):
             next
         [_pos1, _pos2, _gap] = [int(line.split()[3]), int(line.split()[7]), int(line.split()[8])]
         mat[_pos1/bin_size][_pos2/bin_size] += 1
     fin.close()
-    np.savetxt('chr3.mat', mat/2, delimiter='\t', fmt='%d')
-
+    for i in xrange(mat.shape[0]):
+        for j in xrange(mat.shape[0]):
+            if(mat[i][j] >= min_count):
+                print chrom, i*bin_size, j*bin_size, int(mat[i][j])
+    
 if __name__ == '__main__':
     main()

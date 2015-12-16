@@ -52,10 +52,8 @@ extract_feat_genome <- function(genome, chroms, num.cores, bin_size, cs.pos, cs.
 }
 
 bin_size = 5000
-num.cores = 6
+num.cores = 10
 genome <- BSgenome.Mmusculus.UCSC.mm9
-
-# step 1. segment genome
 
 # step 2. read in effective cutter interval
 cs.pos <- read.table("data/mm9.MboI.500bp.pos.merged.bed")
@@ -65,7 +63,7 @@ colnames(cs.pos) = colnames(cs.neg) = c("chr", "start", "end")
 chroms <- paste("chr", c(1:19, "X", "Y"), sep="")
 res <- extract_feat_genome(genome, chroms, num.cores, bin_size, cs.pos, cs.neg)
 
-write.table(as.data.frame(res), file = "genomicFeatures.mm9.MboI.5k.bed", append = FALSE, quote = FALSE, sep = "\t",
+write.table(as.data.frame(res)[,c(1,2,3,6,7)], file = "genomicFeatures.mm9.MboI.5k.bed", append = FALSE, quote = FALSE, sep = "\t",
                  eol = "\n", na = "NA", dec = ".", row.names = FALSE,
                  col.names = FALSE, qmethod = c("escape", "double"),
                  fileEncoding = "")

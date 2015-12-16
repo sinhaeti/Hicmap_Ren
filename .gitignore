@@ -6,6 +6,7 @@ data/hg19.Hind3.500bp.neg.merged.bed
 data/hg19.Hind3.500bp.pos.merged.bed
 data/mm9.Hind3.500bp.neg.merged.bed
 data/mm9.Hind3.500bp.pos.merged.bed
+data/genomicFeatures.*
 
 *.bam
 *.sam
@@ -13,3 +14,6 @@ data/mm9.Hind3.500bp.pos.merged.bed
 metrics.*.txt
 demo_tmp/
 chip_tmp/
+*.err
+*.out
+*.Log

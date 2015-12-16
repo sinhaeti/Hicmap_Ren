@@ -110,82 +110,144 @@ if ! [[ $MIN_INSERT_SIZE =~ $re ]] ; then
    exit 1
 fi
 
+MEM_FREE=$(cat /proc/meminfo | grep MemFree | awk '{print $2}')	
+
 mkdir $PREFIX\_tmp
+<<<<<<< HEAD
 echo "Starting now"
 echo "Step1. map reads and filter non-uniquely mapped reads" 
 date
+=======
+echo "$(date) Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 
+if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.bam ]; then
+	if [ ${FASTQ1: -4} == ".bz2" ];
+	then
+		bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $FASTQ1) | \
+			chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam &
+	elif [ ${FASTQ1: -4} == ".gz" ]
+	then
+		bwa mem -t $((THREADS/2)) $GENOME $FASTQ1 | \
+			chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam &
+	else
+		bwa mem -t $((THREADS/2)) $GENOME $FASTQ1 | \
+			chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam &	
+	fi
+else
+	printf 'warning: %s_tmp/%s_R1.uniq.bam already exists.\n' "$PREFIX" "$PREFIX"
+fi
+>>>>>>> d60b3a8ac9866b89b6407a79887ed486332c375e
 
-#mkfifo R1.fifo
-#mkfifo R2.fifo
-#bwa mem .... > R1.fifo &
-#bwa mem .... > R2.fifo &
-#merge R1.fifo R2.fifo | samtools view -Sb - > output.bam 
+if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.bam ]; then
+	if [ ${FASTQ2: -4} == ".bz2" ];
+	then
+		bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $FASTQ2) | \
+			chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam &
+	else
+		bwa mem -t $((THREADS/2)) $GENOME $FASTQ2 | \
+			chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam &
+	fi	
+else
+	printf 'warning: %s_tmp/%s_R2.uniq.bam already exists.\n' "$PREFIX" "$PREFIX"
+fi
+wait
 
+echo 
+echo "$(date) Step2. filter reads that are  > 500bp far from restriction cutter sites" 
+if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam ]; then
+	samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam &
+	samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
+	wait
+	samtools cat -o $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
+	wait
+	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam
+	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam
+else
+	printf 'warning: %s_tmp/%s_R1.uniq.filtered.bam already exist.\n' "$PREFIX" "$PREFIX"		
+fi
+wait 
+
+if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam ]; then
+	samtools view -b -f 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam &
+	samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
+	wait
+	samtools cat -o $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
+	wait
+	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam
+	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam
+else
+	printf 'warning: %s_tmp/%s_R2.uniq.filtered.bam already exist.\n' "$PREFIX" "$PREFIX"	
+fi
+wait
+
+echo 
+echo "$(date) Step3. sort reads by read names" 
+if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam ]; then
+	samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
+	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam
+else
+	printf 'warning: %s_tmp/%s_R1.uniq.filtered.sorted.bam already exists.\n'  "$PREFIX" "$PREFIX" 
+fi
+
+if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam ]; then
+	samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
+	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam
+else
+	printf 'warning: %s_tmp/%s_R2.uniq.filtered.sorted.bam already exist.\n'  "$PREFIX" "$PREFIX"
+fi
+
+echo
+echo "$(date) Step4. pair up two ends" 
+if [ ! -f $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam ]; then
+	pair2mates -m $MIN_INSERT_SIZE -o $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam	
+else
+	printf 'warning: %s_tmp/%s.uniq.filtered.paired.bam already exist.\n'  "$PREFIX" "$PREFIX"
+fi
+
+echo 
+echo "$(date) Step5. sort based on genomic coordinates" 
+if [ ! -f $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam ]; then
+	samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted
+else
+	printf 'warning: %s_tmp/%s.uniq.filtered.paired.sorted.bam already exist.\n'  "$PREFIX" "$PREFIX"
+fi
+
+echo 
+echo "$(date) Step6. Remove PCR duplication"
+if [ ! -f $PREFIX.uniq.filtered.paired.sorted.nodup.bam ]; then
+	java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam OUTPUT=$PREFIX.uniq.filtered.paired.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
+else
+	printf 'warning: %s_tmp/%s.uniq.filtered.paired.sorted.nodup.bam already exist.\n'  "$PREFIX" "$PREFIX"
+fi
+
+samtools index $PREFIX.uniq.filtered.paired.sorted.nodup.bam
+
+echo 
+echo "$(date) Step7. Summerizing ..."
 if [ ${FASTQ1: -4} == ".bz2" ];
 then
-	bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $FASTQ1) 2>$PREFIX\_tmp/$PREFIX\_R1.bwa.log | \
-		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam &
-else
-	bwa mem -t $((THREADS/2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX\_R1.bwa.log | \
-		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam &
-fi
-
-if [ ${FASTQ2: -4} == ".bz2" ];
+	TOTAL_READS=$(bzcat $FASTQ1 | wc -l | awk '{print $1}')
+elif [ ${FASTQ1: -4} == ".gz" ]
 then
-	bwa mem -t $((THREADS/2)) $GENOME <(bzip2 -dc $FASTQ2) 2>$PREFIX\_tmp/$PREFIX\_R2.bwa.log | \
-		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam &
+	TOTAL_READS=$(zcat $FASTQ1 | wc -l | awk '{print $1}') 
 else
-	bwa mem -t $((THREADS/2)) $GENOME $FASTQ2 2> $PREFIX\_tmp/$PREFIX\_R2.bwa.log | \
-		chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam &
+	TOTAL_READS=$(wc -l $FASTQ1 | awk '{print $1}') 
 fi
+
+UNIQ_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.bam | wc -l | awk '{print $1}') 
+UNIQ_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.bam | wc -l | awk '{print $1}') 
+UNIQ_FILTERED_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam | wc -l | awk '{print $1}') 
+UNIQ_FILTERED_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam | wc -l | awk '{print $1}')
+UNIQ_FILTERED_PAIRED_READS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam | wc -l | awk '{print $1}')
+UNIQ_FILTERED_PAIRED_NODUP_READS=$(samtools view $PREFIX.uniq.filtered.paired.sorted.nodup.bam | wc -l | awk '{print $1}') 
 wait
 
-samtools flagstat $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam.flagstat &
-samtools flagstat $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam.flagstat &
+echo
+echo "================================ Summary =================================="
+echo "total number of reads = $((TOTAL_READS/4))"
+echo "uniquely mapped reads (MAPQ>10) for R1=$UNIQ_READS_R1 and R2=$UNIQ_READS_R2"
+echo "500bp closed to cutter sites for R1=$UNIQ_FILTERED_READS_R1 and R2=$UNIQ_FILTERED_READS_R1"
+echo "cis-pair with min insert size $MIN_INSERT_SIZE = $((UNIQ_FILTERED_PAIRED_READS/2))"
+echo "After removing PCR duplication, left reads=$((UNIQ_FILTERED_PAIRED_NODUP_READS/2))"	
 
-echo "Step2. filter reads that are  > 500bp far from restriction cutter sites" 
-date
-# positive strand
-samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam &
-samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam &
-samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
-samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
-wait
 
-# merge both strands
-samtools cat -o $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
-samtools cat -o $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
-wait
-date
-
-rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam
-rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam
-rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam
-rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam
-
-samtools flagstat $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam.flagstat &
-samtools flagstat $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam.flagstat &
-
-echo "Step3. sort reads by read names" 
-samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
-samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
-
-rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam
-rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam
-date
-
-echo "Step4. pair up two ends" 
-pair2mates -m $MIN_INSERT_SIZE -o $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam
-date
-
-echo "Step5. sort based on genomic coordinates" 
-samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted
-rm $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam
-samtools flagstat $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam > $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam.flagstat &
-date
-
-echo "Step6. Filter PCR duplication"
-java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam OUTPUT=$PREFIX.uniq.filtered.paired.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
-samtools flagstat $PREFIX.uniq.filtered.paired.sorted.nodup.bam > $PREFIX.uniq.filtered.paired.sorted.nodup.bam.flagstat
-date
 

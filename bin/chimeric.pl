@@ -2,7 +2,7 @@
 use strict;
 
 sub Log {
-  print STDERR @_;
+#  print STDERR @_;
 }
 
 sub MDist {

@@ -11,6 +11,9 @@ $ hicmap -t 2 -m 3G -d 1000 -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz
 - [bwa](https://github.com/lh3/bwa) for mapping raw reads
 - [samtools 1.2+](http://www.htslib.org/doc/samtools.html) for sorting and piling up
 - [Picard](http://broadinstitute.github.io/picard/) for remove PCR duplication
+- [Python2.7]
+- [numpy]
+- [pysam]
 
 ##Introduction
 

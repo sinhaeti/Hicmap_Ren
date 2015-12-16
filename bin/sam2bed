@@ -1,0 +1,84 @@
+#!/opt/python/bin/python
+
+import sys
+import optparse
+import os.path
+import collections
+import operator 
+
+def main():
+    
+    # get arguments from user
+    parser = optparse.OptionParser(description='Partition genome into bins based on the given BSIZE and count the number of interactions between every 2 bins.', 
+                                   usage='%prog [-h] [-i INPUT] [-s BSIZE] [-m MIN_COUNT]')
+
+    parser.add_option('-i',
+                      dest="INPUT",
+                      help='The input file that contains the filtered pair-end reads loci is in BAM format (e.g. returned by function extract_cis_reads).'
+                      )
+   
+    parser.add_option('-s',
+                      dest="BSIZE", 
+                      type=int,
+                      help='Bin size.'
+                      )
+
+    parser.add_option('-m',
+                      dest="MIN_COUNT", 
+                      type=int,
+                      help='Min count to output.'
+                      )
+                      
+    parser.add_option('--version',
+                      dest="version",
+                      default=1.0,
+                      type="float",
+                      )
+                      
+    options, remainder = parser.parse_args()
+    
+    bin_size = 40000
+    min_count = 3
+    
+    infile = options.INPUT
+    if options.BSIZE:
+        bin_size = options.BSIZE
+
+    if options.MIN_COUNT:
+        min_count = options.MIN_COUNT
+    
+    infile = options.INPUT    
+    if not infile:
+        parser.print_help()
+        exit('error: too few arguments, missing INPUT')
+
+	if infile != "-" and not os.path.isfile(infile): exit("error: \'%s\' not exist" % infile);
+    
+    if infile != "-" and os.path.isfile(infile): fin = open(infile);
+	
+    if infile == "-": fin = sys.stdin
+    
+# counting the interaction between 2 bins
+    map_dict = collections.defaultdict(int)
+    for line in fin:
+        _chr = line.split()[2]
+        [_pos1, _pos2] = sorted([int(line.split()[3]), int(line.split()[7])])
+        key = '\t'.join([_chr, str(_pos1/bin_size), str(_pos2/bin_size)])
+        map_dict[key] += 1
+
+# convert dict to list
+    map_lst = []
+    for key in map_dict:
+       elems = key.split('\t')
+       if map_dict[key] >= min_count:
+           [_chr, _pos1, _pos2, _count] = [elems[0], int(elems[1])*bin_size, int(elems[2])*bin_size, int(map_dict[key])]
+           map_lst.append([_chr, _pos1, _pos2, _count/2])
+    fin.close()
+
+# sort the list based on chr pos1 and pos2    
+    map_lst_sorted = sorted(map_lst, key=operator.itemgetter(0, 1, 2)) 
+    for elem in map_lst_sorted:
+        print('\t'.join(map(str, elem)))
+
+if __name__ == '__main__':
+    main()

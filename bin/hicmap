@@ -85,6 +85,12 @@ if [ ! -f $FASTQ2 ]; then
 	exit 1
 fi
 
+if [ ! -f $MARK_DUPLICATE ]; then
+	usage
+    echo "error: '$MARK_DUPLICATE' not exists.";
+	exit 1
+fi
+
 if [ ! -f $GENOME ]; then
 	usage
     echo "error: '$GENOME' not exists.";
@@ -113,6 +119,8 @@ fi
 MEM_FREE=$(cat /proc/meminfo | grep MemFree | awk '{print $2}')	
 
 mkdir $PREFIX\_tmp
+
+echo "$@" # print whole command
 echo "$(date) Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 
 if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.bam ]; then
 	if [ ${FASTQ1: -4} == ".bz2" ];
@@ -147,27 +155,23 @@ wait
 
 echo 
 echo "$(date) Step2. filter reads that are  > 500bp far from restriction cutter sites" 
-if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam ]; then
+if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam ]; then
 	samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam &
 	samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
 	wait
 	samtools cat -o $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
 	wait
-	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam
-	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam
 else
 	printf 'warning: %s_tmp/%s_R1.uniq.filtered.bam already exist.\n' "$PREFIX" "$PREFIX"		
 fi
 wait 
 
-if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam ]; then
+if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam ]; then
 	samtools view -b -f 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam &
 	samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
 	wait
 	samtools cat -o $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
 	wait
-	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam
-	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam
 else
 	printf 'warning: %s_tmp/%s_R2.uniq.filtered.bam already exist.\n' "$PREFIX" "$PREFIX"	
 fi
@@ -177,14 +181,12 @@ echo
 echo "$(date) Step3. sort reads by read names" 
 if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam ]; then
 	samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
-	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam
 else
 	printf 'warning: %s_tmp/%s_R1.uniq.filtered.sorted.bam already exists.\n'  "$PREFIX" "$PREFIX" 
 fi
 
 if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam ]; then
 	samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
-	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam
 else
 	printf 'warning: %s_tmp/%s_R2.uniq.filtered.sorted.bam already exist.\n'  "$PREFIX" "$PREFIX"
 fi
@@ -212,7 +214,6 @@ if [ ! -f $PREFIX.uniq.filtered.paired.sorted.nodup.bam ]; then
 else
 	printf 'warning: %s_tmp/%s.uniq.filtered.paired.sorted.nodup.bam already exist.\n'  "$PREFIX" "$PREFIX"
 fi
-
 samtools index $PREFIX.uniq.filtered.paired.sorted.nodup.bam
 
 echo 
@@ -236,10 +237,20 @@ UNIQ_FILTERED_PAIRED_NODUP_READS=$(samtools view $PREFIX.uniq.filtered.paired.so
 wait
 
 echo
+echo "================================ cleaning tmporary file =================================="
+rm $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam
+rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam
+rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam
+rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam
+rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam
+rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam
+rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam
+
+echo
 echo "================================ Summary =================================="
 echo "total number of reads = $((TOTAL_READS/4))"
 echo "uniquely mapped reads (MAPQ>10) for R1=$UNIQ_READS_R1 and R2=$UNIQ_READS_R2"
-echo "500bp closed to cutter sites for R1=$UNIQ_FILTERED_READS_R1 and R2=$UNIQ_FILTERED_READS_R1"
+echo "500bp closed to cutter sites for R1=$UNIQ_FILTERED_READS_R1 and R2=$UNIQ_FILTERED_READS_R2"
 echo "cis-pair with min insert size $MIN_INSERT_SIZE = $((UNIQ_FILTERED_PAIRED_READS/2))"
 echo "After removing PCR duplication, left reads=$((UNIQ_FILTERED_PAIRED_NODUP_READS/2))"	
 

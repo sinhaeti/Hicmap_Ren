@@ -1,0 +1,15 @@
+awk '{if($2=="+") printf "%s\t%d\t%d\n", $3, $4-500, $4}' all.MboI.cut.map > tmp.pos.500bp.bed
+awk '{if($2=="-") printf "%s\t%d\t%d\n", $3, $4, $4+500}' all.MboI.cut.map > tmp.neg.500bp.bed
+
+sort -k1,1 -k2,2n tmp.pos.500bp.bed > tmp.pos.500bp.sorted.bed &
+sort -k1,1 -k2,2n tmp.neg.500bp.bed > tmp.neg.500bp.sorted.bed &
+
+bedtools merge -i  tmp.pos.500bp.sorted.bed >  tmp.pos.500bp.merged.bed
+bedtools merge -i  tmp.neg.500bp.sorted.bed >  tmp.neg.500bp.merged.bed
+
+mv tmp.pos.500bp.merged.bed hg19.pos.500bp.merged.bed
+mv tmp.neg.500bp.merged.bed hg19.neg.500bp.merged.bed
+
+
+hicmap -t 10 -m 8G -f /mnt/promoter4/Bin_Raw_Sequence_Data/2015_12_08_DIP_B/PE-12082015-DIPB/SRC143_R1.fastq.bz2 -r /mnt/promoter4/Bin_Raw_Sequence_Data/2015_12_08_DIP_B/PE-12082015-DIPB/SRC143_R2.fastq.bz2 -n SRC143 -g /mnt/thumper/home/r3fang/data/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex/genome.fa -c /mnt/thumper/home/r3fang/github/Hicmap_Ren/data/hg19.MboI.500bp -d 10000 > hicmap.SRC143.Log
+

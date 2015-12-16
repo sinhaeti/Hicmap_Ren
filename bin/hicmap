@@ -113,11 +113,6 @@ fi
 MEM_FREE=$(cat /proc/meminfo | grep MemFree | awk '{print $2}')	
 
 mkdir $PREFIX\_tmp
-<<<<<<< HEAD
-echo "Starting now"
-echo "Step1. map reads and filter non-uniquely mapped reads" 
-date
-=======
 echo "$(date) Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 
 if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.bam ]; then
 	if [ ${FASTQ1: -4} == ".bz2" ];
@@ -135,7 +130,6 @@ if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.bam ]; then
 else
 	printf 'warning: %s_tmp/%s_R1.uniq.bam already exists.\n' "$PREFIX" "$PREFIX"
 fi
->>>>>>> d60b3a8ac9866b89b6407a79887ed486332c375e
 
 if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.bam ]; then
 	if [ ${FASTQ2: -4} == ".bz2" ];

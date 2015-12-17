@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# test if softwares installed
+# PART I check weather softwares installed
 command -v bwa >/dev/null 2>&1 || { echo >&2 "hicmap requires bwa but it's not installed.  Aborting."; exit 1; }
 command -v samtools >/dev/null 2>&1 || { echo >&2 "hicmap requires samtools but it's not installed.  Aborting."; exit 1; }
 
-# pass paramters
+# PART II usage info
 usage(){
 cat << EOF
 
 Program: hicmap (Hi-C analysis pipeline)
-Version: 12.05-r15
+Version: 12.17-r15
 Contact: Rongxin Fang <r3fang@ucsd.edu>
 Lab: http://bioinformatics-renlab.ucsd.edu/rentrac/
 
@@ -39,9 +39,12 @@ Options:
 EOF
 } 
 
+# PART III default params
 THREADS=1
 MAX_MEM="4G"
 
+
+# PART IV receiving arguments
 while getopts ":t:m:f:r:p:n:g:c:d:" opt;
 do
 	case "$opt" in
@@ -151,75 +154,44 @@ wait
 
 echo 
 echo "$(date) Step2. filter reads that are  > 500bp far from restriction cutter sites" 
-if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam ]; 
+if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam ] || [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam ]; 
 then
 	samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam &
 	samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
-	wait
-	samtools cat -o $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
-	wait
-	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam
-	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam
-else
-	printf 'warning: %s_tmp/%s_R1.uniq.filtered.bam already exist.\n' "$PREFIX" "$PREFIX"		
-fi
-
-
-if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam ]; 
-then	
 	samtools view -b -F 16 -L $CUT_ENZ.pos.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam &
 	samtools view -b -f 16 -L $CUT_ENZ.neg.merged.bed $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
 	wait
+	samtools cat -o $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam &
 	samtools cat -o $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam &
 	wait
+	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.pos.bam
+	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.neg.bam
 	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.pos.bam
 	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.neg.bam
-else
-	printf 'warning: %s_tmp/%s_R2.uniq.filtered.bam already exist.\n' "$PREFIX" "$PREFIX"	
-fi
-
-echo 
-echo "$(date) Step3. sort reads by read names" 
-if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam ]; then
 	samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
-else
-	printf 'warning: %s_tmp/%s_R1.uniq.filtered.sorted.bam already exists.\n'  "$PREFIX" "$PREFIX" 
-fi
-
-if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam ]; then
 	samtools sort -m $MAX_MEM -n $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
-else
-	printf 'warning: %s_tmp/%s_R2.uniq.filtered.sorted.bam already exist.\n'  "$PREFIX" "$PREFIX"
+	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam	
+	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam	
 fi
-
-rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam
-rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam
 
 echo
-echo "$(date) Step4. pair up two ends" 
-if [ ! -f $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam ]; then
+echo "$(date) Step4. pair up two ends and sort based on coordinates" 
+if [ ! -f $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam ]; then
 	pair2mates -m $MIN_INSERT_SIZE -o $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam	
+	samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted
+	rm $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam
 else
 	printf 'warning: %s_tmp/%s.uniq.filtered.paired.bam already exist.\n'  "$PREFIX" "$PREFIX"
-fi
-
-echo 
-echo "$(date) Step5. sort based on genomic coordinates" 
-if [ ! -f $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam ]; then
-	samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted
-else
-	printf 'warning: %s_tmp/%s.uniq.filtered.paired.sorted.bam already exist.\n'  "$PREFIX" "$PREFIX"
 fi
 
 echo 
 echo "$(date) Step6. Remove PCR duplication"
 if [ ! -f $PREFIX.uniq.filtered.paired.sorted.nodup.bam ]; then
 	java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam OUTPUT=$PREFIX.uniq.filtered.paired.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
+	samtools index $PREFIX.uniq.filtered.paired.sorted.nodup.bam
 else
 	printf 'warning: %s_tmp/%s.uniq.filtered.paired.sorted.nodup.bam already exist.\n'  "$PREFIX" "$PREFIX"
 fi
-samtools index $PREFIX.uniq.filtered.paired.sorted.nodup.bam
-rm $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.bam
 
 echo 
 echo "$(date) Step7. Summerizing ..."
@@ -233,21 +205,16 @@ else
 	TOTAL_READS=$(wc -l $FASTQ1 | awk '{print $1}') 
 fi
 
-UNIQ_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.bam | wc -l | awk '{print $1}') 
-UNIQ_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.bam | wc -l | awk '{print $1}') 
-UNIQ_FILTERED_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam | wc -l | awk '{print $1}') 
-UNIQ_FILTERED_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam | wc -l | awk '{print $1}')
+#UNIQ_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.bam | wc -l | awk '{print $1}') 
+#UNIQ_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.bam | wc -l | awk '{print $1}') 
+#UNIQ_FILTERED_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam | wc -l | awk '{print $1}') 
+#UNIQ_FILTERED_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam | wc -l | awk '{print $1}')
 UNIQ_FILTERED_PAIRED_READS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.sorted.bam | wc -l | awk '{print $1}')
 UNIQ_FILTERED_PAIRED_NODUP_READS=$(samtools view $PREFIX.uniq.filtered.paired.sorted.nodup.bam | wc -l | awk '{print $1}') 
-wait
 
-echo
 echo "================================ Summary =================================="
 echo "total number of reads = $((TOTAL_READS/4))"
 echo "uniquely mapped reads (MAPQ>10) for R1=$UNIQ_READS_R1 and R2=$UNIQ_READS_R2"
 echo "500bp closed to cutter sites for R1=$UNIQ_FILTERED_READS_R1 and R2=$UNIQ_FILTERED_READS_R2"
 echo "cis-pair with min insert size $MIN_INSERT_SIZE = $((UNIQ_FILTERED_PAIRED_READS/2))"
-echo "After removing PCR duplication, left reads=$((UNIQ_FILTERED_PAIRED_NODUP_READS/2))"	
-
-
-
+echo "After removing PCR duplication, left reads = $((UNIQ_FILTERED_PAIRED_NODUP_READS/2))"

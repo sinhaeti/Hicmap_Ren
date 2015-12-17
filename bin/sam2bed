@@ -70,9 +70,9 @@ def main():
     map_lst = []
     for key in map_dict:
        elems = key.split('\t')
-       if map_dict[key] >= min_count:
-           [_chr, _pos1, _pos2, _count] = [elems[0], int(elems[1])*bin_size, int(elems[2])*bin_size, int(map_dict[key])]
-           map_lst.append([_chr, _pos1, _pos2, _count/2])
+       if int(map_dict[key]) >= 2*min_count:
+           [_chr, _pos1, _pos2, _count] = [elems[0], int(elems[1])*bin_size, int(elems[2])*bin_size, int(map_dict[key])/2]
+           map_lst.append([_chr, _pos1, _pos2, int(_count)])
     fin.close()
 
 # sort the list based on chr pos1 and pos2    

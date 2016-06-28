@@ -11,7 +11,8 @@ $ wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/cutter_sites.tar.gz
 $ tar -xvzf cutter_sites.tar.gz
 $ mkdir BWAIndex/; wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/mm9.fa -P BWAIndex
 $ bwa index BWAIndex/mm9.fa
-$ hicmap -t 2 -m 3G -f demo_R1.fastq.bz2 -r demo_R2.fastq.bz2 -n demo -p Picard/MarkDuplicates.jar -g BWAIndex/mm9.fa -c cutter_sites/mm9.Hind3.1000bp.bed -d 1000 
+$ hicmap -t 2 -m 3G -f demo_R1.fastq.bz2 -r demo_R2.fastq.bz2 -n demo \
+  -p Picard/MarkDuplicates.jar -g BWAIndex/mm9.fa -c cutter_sites/mm9.Hind3.1000bp.bed -d 1000 
 ```
 
 ##Depedency

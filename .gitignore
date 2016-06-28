@@ -1,2 +1,4 @@
 bin/pair2mates
-data/*.GenomicFeatures.*
+cutter_sites/*
+data/*
+demo_*

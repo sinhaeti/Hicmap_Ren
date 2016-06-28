@@ -4,16 +4,22 @@ $ git clone --recursive https://github.com/r3fang/Hicmap_Ren.git
 $ cd Hicmap_Ren
 $ bash install.sh
 $ export PATH=$PATH:/path/to/Hicmap_Ren/bin
-$ hicmap -t 2 -m 3G -d 1000 -f data/JL_H4_R1.fastq.bz2 -r data/JL_H4_R2.fastq.bz2 -n JL_H4 -p bin/MarkDuplicates.jar -g BWAIndex/genome.fa -c data/mm9.MboI.500bp 
+$ # download demo HiC data (Dixon 2016)
+$ wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/demo_R1.fastq.bz2
+$ wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/demo_R2.fastq.bz2
+$ wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/cutter_sites.tar.gz 
+$ tar -xvzf cutter_sites.tar.gz
+$ mkdir BWAIndex/; wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/mm9.fa -P BWAIndex
+$ bwa index BWAIndex/mm9.fa
+$ hicmap -t 2 -m 3G -f demo_R1.fastq.bz2 -r demo_R2.fastq.bz2 -n demo -p Picard/MarkDuplicates.jar -g BWAIndex/mm9.fa -c cutter_sites/mm9.Hind3.1000bp.bed -d 1000 
 ```
 
 ##Depedency
-- [bwa](https://github.com/lh3/bwa) for mapping raw reads
-- [samtools 1.2+](http://www.htslib.org/doc/samtools.html) for sorting and piling up
-- [Picard](http://broadinstitute.github.io/picard/) for remove PCR duplication
-- [Python2.7]
-- [numpy]
-- [pysam]
+- [bwa](https://github.com/lh3/bwa)
+- [samtools 1.2+](http://www.htslib.org/doc/samtools.html)
+- [Python 2.7](https://www.python.org/download/releases/2.7/)
+- [numpy](http://www.numpy.org/)
+- [pysam](https://github.com/pysam-developers/pysam)
 
 ##Introduction
 

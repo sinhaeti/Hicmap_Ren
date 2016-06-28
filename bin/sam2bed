@@ -10,7 +10,7 @@ def main():
     
     # get arguments from user
     parser = optparse.OptionParser(description='Partition genome into bins based on the given BSIZE and count the number of interactions between every 2 bins.', 
-                                   usage='%prog [-h] [-i INPUT] [-s BSIZE] [-m MIN_COUNT]')
+                                   usage='%prog [-h] [-i INPUT] [-s BSIZE] [-o OUTPUT]')
 
     parser.add_option('-i',
                       dest="INPUT",
@@ -23,12 +23,11 @@ def main():
                       help='Bin size.'
                       )
 
-    parser.add_option('-m',
-                      dest="MIN_COUNT", 
-                      type=int,
-                      help='Min count to output.'
+    parser.add_option('-o',
+                      dest="OUTPUT", 
+                      help='Prefix of output files.'
                       )
-                      
+
     parser.add_option('--version',
                       dest="version",
                       default=1.0,
@@ -38,19 +37,19 @@ def main():
     options, remainder = parser.parse_args()
     
     bin_size = 40000
-    min_count = 3
     
     infile = options.INPUT
     if options.BSIZE:
         bin_size = options.BSIZE
-
-    if options.MIN_COUNT:
-        min_count = options.MIN_COUNT
     
     infile = options.INPUT    
     if not infile:
         parser.print_help()
         exit('error: too few arguments, missing INPUT')
+
+    if not options.OUTPUT:
+        parser.print_help()
+        exit('error: too few arguments, missing OUTPUT')
 
 	if infile != "-" and not os.path.isfile(infile): exit("error: \'%s\' not exist" % infile);
     
@@ -58,27 +57,45 @@ def main():
 	
     if infile == "-": fin = sys.stdin
     
+    fout1 = open(options.OUTPUT+".count", "w")
+    fout2 = open(options.OUTPUT+"_xgi.bed", "w")
+    
+    max_bin = 0
 # counting the interaction between 2 bins
-    map_dict = collections.defaultdict(int)
+    map_dict = {}
     for line in fin:
         _chr = line.split()[2]
         [_pos1, _pos2] = sorted([int(line.split()[3]), int(line.split()[7])])
         key = '\t'.join([_chr, str(_pos1/bin_size), str(_pos2/bin_size)])
-        map_dict[key] += 1
-
-# convert dict to list
-    map_lst = []
-    for key in map_dict:
-       elems = key.split('\t')
-       if int(map_dict[key]) >= 2*min_count:
-           [_chr, _pos1, _pos2, _count] = [elems[0], int(elems[1])*bin_size, int(elems[2])*bin_size, int(map_dict[key])/2]
-           map_lst.append([_chr, _pos1, _pos2, int(_count)])
+        if _pos1/bin_size > max_bin: max_bin = _pos1/bin_size;
+        if _pos2/bin_size > max_bin: max_bin = _pos2/bin_size;
+        if key not in map_dict:
+            map_dict[key] = 1
+        else:
+            map_dict[key] += 1
     fin.close()
+    
+    for i in xrange(max_bin):
+        for j in xrange(i+1):
+            key = '\t'.join([_chr, str(j), str(i)])
+            if key in map_dict:
+                if int(map_dict[key])/2 > 0:
+                    _count = int(map_dict[key])/2
+                    _bin1_l = bin_size*(j)+1
+                    _bin1_r = bin_size*(j+1)-1   
+                    _bin2_l = bin_size*(i)+1
+                    _bin2_r = bin_size*(i+1)-1  
+                    _bin1 = "".join([_chr, ":", str(_bin1_l), "-", str(_bin1_r)])
+                    _bin2 = "".join([_chr, ":", str(_bin2_l), "-", str(_bin2_r)])
+                    fout1.write("\t".join([_bin1, _bin2, str(_count), "\n"]))
+    fout1.close()    
 
-# sort the list based on chr pos1 and pos2    
-    map_lst_sorted = sorted(map_lst, key=operator.itemgetter(0, 1, 2)) 
-    for elem in map_lst_sorted:
-        print('\t'.join(map(str, elem)))
+    for i in xrange(max_bin):
+        _bin2_l = bin_size*(i)
+        _bin2_r = bin_size*(i+1)-1  
+        _bin2 = "".join([_chr, ":", str(_bin2_l+1), "-", str(_bin2_r)])
+        fout2.write("\t".join([_chr, str(_bin2_l), str(_bin2_r), _bin2, "0", ".", "\n"]))        
+    fout2.close()    
 
 if __name__ == '__main__':
     main()

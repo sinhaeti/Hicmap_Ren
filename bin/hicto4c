@@ -1,5 +1,5 @@
-#!/opt/python/bin/python
-# extract all interactions from one loci
+#!/usr/bin/env python
+
 import sys
 import optparse
 import os.path

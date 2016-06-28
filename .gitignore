@@ -2,3 +2,4 @@ bin/pair2mates
 cutter_sites/*
 data/*
 demo_*
+wrapper.sh

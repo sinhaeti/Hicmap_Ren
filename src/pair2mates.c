@@ -198,11 +198,23 @@ void opt_destory(opt_t *s){
 void pairUp(opt_t *opt){
 	samFile *in1 = sam_open(opt->input1, "r");
 	samFile *in2 = sam_open(opt->input2, "r");
-	BGZF *out = bgzf_open(opt->output, "w");
+	
+	char *cis = malloc(strlen(opt->output) + strlen(".cis.bam")+1);
+	char *trans = malloc(strlen(opt->output) + strlen(".trans.bam")+1);
+
+	strcpy(cis, opt->output);
+	strcpy(trans, opt->output);
+	printf("%s\n", cis);
+	strcat(cis, ".cis.bam");
+	strcat(trans, ".trans.bam");
+
+	BGZF *out_cis = bgzf_open(cis, "w");
+	BGZF *out_trans = bgzf_open(trans, "w");
 	
 	if(in1 == NULL) die("pairUp: fail to open file '%s'", opt->input1);
 	if(in2 == NULL) die("pairUp: fail to open file '%s'", opt->input2);
-	if(out == NULL) die("pairUp: fail to open file '%s'", opt->output);
+	if(out_cis == NULL) die("pairUp: fail to open file '%s'", cis);
+	if(out_trans == NULL) die("pairUp: fail to open file '%s'", trans);
 	
 	//if(access(opt->output, F_OK)!=-1 && opt->f==false) die("pairUp: %s exists, use opetion -f to overwrite", opt->output);
 	bam_hdr_t *header1 = sam_hdr_read(in1);
@@ -220,7 +232,8 @@ void pairUp(opt_t *opt){
 	
 	kstring_t *name1 = mycalloc(1, kstring_t); 
 	kstring_t *name2 = mycalloc(1, kstring_t); 
-	bam_hdr_write(out, header1);
+	bam_hdr_write(out_cis, header1);
+	bam_hdr_write(out_trans, header1);
 	
 	while (ret1 >= 0 && ret2 >= 0){
 		name1->s = get_pair_name(aln1); name1->l = strlen(name1->s);
@@ -232,54 +245,56 @@ void pairUp(opt_t *opt){
 			// if two mates mapped to the same chromosome
 			if(strcmp(header1->target_name[aln1->core.tid],  header2->target_name[aln2->core.tid])==0){
 				// if they are mapped to the same strand
-				if(aln1->core.flag == 0 && aln2->core.flag == 0){
-					aln1->core.flag = 99;
-					aln1->core.mtid = aln1->core.tid;				
-					aln1->core.mpos = aln2->core.pos;
-					aln1->core.isize = aln2->core.pos - aln1->core.pos;				
-					aln2->core.flag = 147;			
-					aln2->core.mtid = aln2->core.tid;	
-					aln2->core.mpos = aln1->core.pos;
-					aln2->core.isize =  aln1->core.pos - aln2->core.pos;
-					bam_write1(out, aln1);
-					bam_write1(out, aln2);
+			if(aln1->core.flag == aln2->core.flag){
+				aln1->core.flag = 99;
+				aln1->core.mtid = aln2->core.tid;				
+				aln1->core.mpos = aln2->core.pos;
+				aln1->core.isize = aln2->core.pos - aln1->core.pos;				
+				aln2->core.flag = 147;			
+				aln2->core.mtid = aln1->core.tid;	
+				aln2->core.mpos = aln1->core.pos;
+				aln2->core.isize =  aln1->core.pos - aln2->core.pos;
+				bam_write1(out_cis, aln1);
+				bam_write1(out_cis, aln2);					
+				}//if they are mapped to the different strand and far from each other
+			else if(aln1->core.flag != aln2->core.flag){
+				aln1->core.flag = 83;
+				aln1->core.mtid = aln2->core.tid;				
+				aln1->core.mpos = aln2->core.pos;
+				aln1->core.isize = aln2->core.pos - aln1->core.pos;				
+				aln2->core.flag = 163;			
+				aln2->core.mtid = aln1->core.tid;	
+				aln2->core.mpos = aln1->core.pos;
+				aln2->core.isize =  aln1->core.pos - aln2->core.pos;
+				bam_write1(out_cis, aln1);
+				bam_write1(out_cis, aln2);
 				}
-				if(aln1->core.flag == 16 && aln2->core.flag == 16){
-					aln1->core.flag = 83;
-					aln1->core.mtid = aln1->core.tid;				
+			} else if(strcmp(header1->target_name[aln1->core.tid],  header2->target_name[aln2->core.tid])!=0){
+				// if two ends mapped to different chromosomes
+				if(aln1->core.flag == aln2->core.flag){
+					aln1->core.flag = 97;
+					aln1->core.mtid = aln2->core.tid;				
 					aln1->core.mpos = aln2->core.pos;
 					aln1->core.isize = aln2->core.pos - aln1->core.pos;				
-					aln2->core.flag = 163;			
-					aln2->core.mtid = aln2->core.tid;	
+					aln2->core.flag = 145;			
+					aln2->core.mtid = aln1->core.tid;	
 					aln2->core.mpos = aln1->core.pos;
 					aln2->core.isize =  aln1->core.pos - aln2->core.pos;
-					bam_write1(out, aln1);
-					bam_write1(out, aln2);
-				}
-				if(aln1->core.flag == 0 && aln2->core.flag == 16 && abs(aln1->core.pos - aln2->core.pos) > opt->dist){
-					aln1->core.flag = 99;
-					aln1->core.mtid = aln1->core.tid;				
+					bam_write1(out_trans, aln1);
+					bam_write1(out_trans, aln2);					
+					}//if they are mapped to the different strand and far from each other
+				else if(aln1->core.flag != aln2->core.flag){
+					aln1->core.flag = 81;
+					aln1->core.mtid = aln2->core.tid;				
 					aln1->core.mpos = aln2->core.pos;
 					aln1->core.isize = aln2->core.pos - aln1->core.pos;				
-					aln2->core.flag = 147;			
-					aln2->core.mtid = aln2->core.tid;	
+					aln2->core.flag = 161;			
+					aln2->core.mtid = aln1->core.tid;	
 					aln2->core.mpos = aln1->core.pos;
 					aln2->core.isize =  aln1->core.pos - aln2->core.pos;
-					bam_write1(out, aln1);
-					bam_write1(out, aln2);
-				}
-				if(aln1->core.flag == 16 && aln2->core.flag == 0 && abs(aln1->core.pos - aln2->core.pos) > opt->dist){
-					aln1->core.flag = 83;
-					aln1->core.mtid = aln1->core.tid;				
-					aln1->core.mpos = aln2->core.pos;
-					aln1->core.isize = aln2->core.pos - aln1->core.pos;				
-					aln2->core.flag = 163;			
-					aln2->core.mtid = aln2->core.tid;	
-					aln2->core.mpos = aln1->core.pos;
-					aln2->core.isize =  aln1->core.pos - aln2->core.pos;
-					bam_write1(out, aln1);
-					bam_write1(out, aln2);
-				}			
+					bam_write1(out_trans, aln1);
+					bam_write1(out_trans, aln2);
+					}				
 			}
 			ret1=sam_read1(in1, header1, aln1);
 			ret2=sam_read1(in2, header2, aln2);
@@ -292,7 +307,8 @@ void pairUp(opt_t *opt){
 	bam_destroy1(aln2);
 	sam_close(in1);
 	sam_close(in2);
-	if ( bgzf_close(out)<0 ) error("Close failed\n");
+	if ( bgzf_close(out_cis)<0 ) error("Close failed\n");
+	if ( bgzf_close(out_trans)<0 ) error("Close failed\n");
 	free(name1);
 	free(name2);
 }

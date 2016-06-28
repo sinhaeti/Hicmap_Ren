@@ -3,7 +3,7 @@
 # test if softwares installed
 command -v bwa >/dev/null 2>&1 || { echo >&2 "I require bwa but it's not installed.  Aborting."; exit 1; }
 command -v samtools >/dev/null 2>&1 || { echo >&2 "I require samtools but it's not installed.  Aborting."; exit 1; }
-command -v macs14 >/dev/null 2>&1 || { echo >&2 "I require macs14 but it's not installed.  Aborting."; exit 1; }
+#command -v macs2 >/dev/null 2>&1 || { echo >&2 "I require macs2 but it's not installed.  Aborting."; exit 1; }
 command -v bedtools >/dev/null 2>&1 || { echo >&2 "I require bedtools but it's not installed.  Aborting."; exit 1; }
 command -v wigToBigWig >/dev/null 2>&1 || { echo >&2 "I require wigToBigWig but it's not installed.  Aborting."; exit 1; }
 command -v bedGraphToBigWig >/dev/null 2>&1 || { echo >&2 "I require bedGraphToBigWig but it's not installed.  Aborting."; exit 1; }

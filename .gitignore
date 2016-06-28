@@ -3,3 +3,4 @@ cutter_sites/*
 data/*
 demo_*
 wrapper.sh
+bedGraphToBigWig

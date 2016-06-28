@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -e
 # PART I check weather softwares installed
 command -v bwa >/dev/null 2>&1 || { echo >&2 "hicmap requires bwa but it's not installed.  Aborting."; exit 1; }
 command -v samtools >/dev/null 2>&1 || { echo >&2 "hicmap requires samtools but it's not installed.  Aborting."; exit 1; }

@@ -1,5 +1,5 @@
 ##Get Started     
-```
+```bash
 $ git clone --recursive https://github.com/r3fang/Hicmap_Ren.git
 $ cd Hicmap_Ren
 $ bash install.sh

@@ -8,6 +8,12 @@ data/mm9.Hind3.500bp.neg.merged.bed
 data/mm9.Hind3.500bp.pos.merged.bed
 data/hg19.MboI.500bp.neg.merged.bed
 data/hg19.MboI.500bp.pos.merged.bed
+
+data/hg19.Hind3.500bp.tar.gz
+data/hg19.MboI.500bp.tar.gz
+data/mm9.Hind3.500bp.tar.gz
+data/mm9.MboI.500bp.tar.gz
+
 data/*.GenomicFeatures.*
 
 interaction.*.bed

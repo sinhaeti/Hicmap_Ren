@@ -1,22 +1,20 @@
 #!/opt/python/bin/python
-# convert hi-c sam file to interaction maps
 
 import sys
 import optparse
 import os.path
 import collections
 import operator 
-import numpy as np
 
 def main():
     
     # get arguments from user
-    parser = optparse.OptionParser(description='Convert hi-c sam file to interaction matrix.', 
-                                   usage='%prog [-h] [-i INPUT] [-s BSIZE] [-c CHR] [-g GSIZE]')
+    parser = optparse.OptionParser(description='Partition genome into bins based on the given BSIZE and count the number of interactions between every 2 bins.', 
+                                   usage='%prog [-h] [-i INPUT] [-s BSIZE] [-m MIN_COUNT]')
 
     parser.add_option('-i',
                       dest="INPUT",
-                      help='Pair-end sam file sorted by cooridantes (stdin supported).'
+                      help='The input file that contains the filtered pair-end reads loci is in BAM format (e.g. returned by function extract_cis_reads).'
                       )
    
     parser.add_option('-s',
@@ -25,21 +23,12 @@ def main():
                       help='Bin size.'
                       )
 
-    parser.add_option('-c',
-                      dest="CHROM", 
-                      help='Chromsome name.'
-                      )
-
-    parser.add_option('-g',
-                      dest="GSIZE", 
-                      help='Genome size.'
-                      )
-
     parser.add_option('-m',
                       dest="MIN_COUNT", 
-                      help='Min Count.'
+                      type=int,
+                      help='Min count to output.'
                       )
-                      
+
     parser.add_option('--version',
                       dest="version",
                       default=1.0,
@@ -48,29 +37,16 @@ def main():
                       
     options, remainder = parser.parse_args()
     
-    bin_size = 5000
+    bin_size = 40000
+    min_count = 3
+    
+    infile = options.INPUT
     if options.BSIZE:
         bin_size = options.BSIZE
 
-    if not options.CHROM:
-        parser.print_help()
-        exit('error: too few arguments, missing CHROM')    
-    chrom = options.CHROM
-
-    if not options.MIN_COUNT:
-        min_count = 3
-    else:
-        min_count = int(options.MIN_COUNT)
-
-    if not options.GSIZE:
-        parser.print_help()
-        exit('error: too few arguments, missing GSIZE')
-
-    genome_size = collections.defaultdict(int)
-    with open(options.GSIZE) as fin:
-        for line in fin:
-            genome_size[line.split()[0]] = int(line.split()[1])
-
+    if options.MIN_COUNT:
+        min_count = options.MIN_COUNT
+    
     infile = options.INPUT    
     if not infile:
         parser.print_help()
@@ -81,20 +57,29 @@ def main():
     if infile != "-" and os.path.isfile(infile): fin = open(infile);
 	
     if infile == "-": fin = sys.stdin
-    
-    max_bin_num = (genome_size[chrom]/bin_size + 1)
-    mat = np.zeros((max_bin_num, max_bin_num))
-    print "#", "Bin_Size="+str(bin_size)        
+
+    max_bin = 0;
+    # counting the interaction between 2 bins
+    map_dict = collections.defaultdict(int)
     for line in fin:
-        if line.startswith("@"):
-            next
-        [_pos1, _pos2, _gap] = [int(line.split()[3]), int(line.split()[7]), int(line.split()[8])]
-        mat[_pos1/bin_size][_pos2/bin_size] += 1
-    fin.close()
-    for i in xrange(mat.shape[0]):
-        for j in xrange(mat.shape[0]):
-            if(mat[i][j] >= min_count):
-                print chrom, i*bin_size, j*bin_size, int(mat[i][j])
-    
+        _chr = line.split()[2]
+        [_pos1, _pos2] = sorted([int(line.split()[3]), int(line.split()[7])])
+        key = '\t'.join([_chr, str(_pos1/bin_size), str(_pos2/bin_size)])
+        if _pos1/bin_size > max_bin: max_bin = _pos1/bin_size;
+        if _pos2/bin_size > max_bin: max_bin = _pos2/bin_size;
+        map_dict[key] += 1
+
+    # print as a matrix
+    print "\t".join(["".join(["HIC_bin", str(i+1), "|mm9|", _chr, ":", str(i*bin_size + 1), "-", str((i+1)*bin_size-1)]) for i in range(max_bin)])
+    for i in range(max_bin):
+        tmp = ["".join(["HIC_bin", str(i+1), "|mm9|", _chr, ":", str(i*bin_size + 1), "-", str((i+1)*bin_size-1)])]
+        for j in range(max_bin):
+            key = '\t'.join([_chr, str(i/bin_size), str(j/bin_size)])
+            if key in map_dict:
+                tmp.append("%.1f" % map_dict[key])
+            else:
+                tmp.append("0.0")
+        print "\t".join(tmp)
+
 if __name__ == '__main__':
     main()

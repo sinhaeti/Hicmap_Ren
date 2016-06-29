@@ -28,7 +28,7 @@ hicmap -t 5 -f data/demo_R1.fastq.bz2 -r data/demo_R2.fastq.bz2 -p Picard/MarkDu
 
 Options:    
 	-h, --help           show this help message and exit.
-	-t  THREADS          threads [1].
+	-t  THREADS          threads to be used for BWA mapping [1].
 	-f  FASTQ1           first mate of pair-end sequencing data  [.fq|.gz|.bz2].
 	-r  FASTQ2           second mate of pair-end sequencing data [.fq|.gz|.bz2].
 	-p  MARK_DUPLICATE   path to picard MarkDuplicates.jar [Picard/MarkDuplicates.jar].

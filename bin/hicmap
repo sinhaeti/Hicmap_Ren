@@ -14,10 +14,10 @@ Version: v06.29.2016
 Contact: Rongxin Fang <r3fang@ucsd.edu>
 Lab: http://bioinformatics-renlab.ucsd.edu/rentrac/
 
-Map and processing Hi-C reads
+Mapping Hi-C reads
 (1) indepedently map FASTQ1/FASTQ2 using BWA;
 (2) filter reads with MAPQ < 10;
-(3) filter reads far from restriction enzyme cutter sites (500bp upstream for + strand/500 downstream for - strand);
+(3) filter reads far from restriction enzyme cutter sites (recommanded 1000bp centered at cutter sites);
 (4) pair up two ends and filter invalid hic pairs;
 (5) remove PCR duplication using Picard - MarkDuplicates;
 

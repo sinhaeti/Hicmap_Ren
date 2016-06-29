@@ -1,12 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -e
 
 # test if softwares installed
-command -v bwa >/dev/null 2>&1 || { echo >&2 "I require bwa but it's not installed.  Aborting."; exit 1; }
-command -v samtools >/dev/null 2>&1 || { echo >&2 "I require samtools but it's not installed.  Aborting."; exit 1; }
-#command -v macs2 >/dev/null 2>&1 || { echo >&2 "I require macs2 but it's not installed.  Aborting."; exit 1; }
-command -v bedtools >/dev/null 2>&1 || { echo >&2 "I require bedtools but it's not installed.  Aborting."; exit 1; }
-command -v wigToBigWig >/dev/null 2>&1 || { echo >&2 "I require wigToBigWig but it's not installed.  Aborting."; exit 1; }
-command -v bedGraphToBigWig >/dev/null 2>&1 || { echo >&2 "I require bedGraphToBigWig but it's not installed.  Aborting."; exit 1; }
+command -v bwa >/dev/null 2>&1 || { echo >&2 "chipseq require bwa but it's not installed.  Aborting."; exit 1; }
+command -v samtools >/dev/null 2>&1 || { echo >&2 "chipseq require samtools but it's not installed.  Aborting."; exit 1; }
+command -v bedtools >/dev/null 2>&1 || { echo >&2 "chipseq require bedtools but it's not installed.  Aborting."; exit 1; }
+command -v wigToBigWig >/dev/null 2>&1 || { echo >&2 "chipseq require wigToBigWig but it's not installed.  Aborting."; exit 1; }
+command -v bedGraphToBigWig >/dev/null 2>&1 || { echo >&2 "chipseq require bedGraphToBigWig but it's not installed.  Aborting."; exit 1; }
 
 usage(){
 cat << EOF
@@ -18,25 +18,24 @@ Lab: http://bioinformatics-renlab.ucsd.edu/rentrac/
 usage: ${0##*/} [-h] [-t THREADS] [-m MAX_MEM] [-f INPUT.fastq] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] 
 
 Example:
-chipseq -t 10 -m 8G -f demo_R1.fastq.bz2 -p Picard/MarkDuplicates.jar -n demo -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa
+chipseq -t 1 -m 2G -f demo_R1.fastq.bz2 -p Picard/MarkDuplicates.jar -n demo -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa
 
 Options:    
-	-h, --help			show this help message and exit.
-	-t  THREADS			threads [<5].
-	-m  MAX_MEM			max memory usage [<5GB].
-	-f  INPUT			treatment experiment file [.gz/fastq/fq/bz2].
-	-p  MARK_DUPLICATE  		path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
-	-n  NAME			prefix of output files.
-	-g  BWA_GENOME			BWA indexed reference genome.
-	-s  GSIZE       		'mm' for mouse, 'hs' for human. 
-	
+	-h, --help           show this help message and exit.
+	-t  THREADS          threads [<5].
+	-m  MAX_MEM          max memory usage [<5GB].
+	-f  INPUT            treatment experiment file [.gz|fastq|.bz2].
+	-p  MARK_DUPLICATE   path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
+	-n  NAME             prefix of output files.
+	-g  BWA_GENOME       BWA indexed reference genome.
 EOF
 } 
 
+# PART III default parameters
 THREADS=1
 MAX_MEM="4G"
 
-while getopts ":t:m:f:p:n:g:s:" opt;
+while getopts ":t:m:f:p:n:g:" opt;
 do
 	case "$opt" in
 		t) THREADS=$OPTARG;;
@@ -46,29 +45,21 @@ do
 		n) PREFIX=$OPTARG;;
 		g) GENOME=$OPTARG;;
 		\?) usage
+			echo "error: unrecognized option -$OPTARG"; 
 			exit 1
 			;;
 	esac
 done
 
 
-if [ $# -lt 12 ] ; then
+if [ $# -lt 8 ] ; then
    usage
    echo "error: too few arguments"
    exit 1
 fi
-
-echo THREADS=$THREADS
-echo MAX_MEM=$MAX_MEM 
-echo INPUT=$INPUT 
-echo PREFIX=$PREFIX
-echo GENOME=$GENOME
-
-# check if input file exists
-if [ ! -f $MARK_DUPLICATE ]; then
-	usage
-    echo "error: '$MARK_DUPLICATE' not exists.";
-	exit 1
+if [ -z ${INPUT+x} ]; then 
+	echo "error: missing variable -i INPUT";
+	exit 1;
 fi
 
 if [ ! -f $INPUT ]; then
@@ -77,15 +68,63 @@ if [ ! -f $INPUT ]; then
 	exit 1
 fi
 
-if [ ! -f $GENOME ]; then
+if [ -z ${THREADS+x} ]; then 
+	echo "error: missing variable -i INPUT";
+	exit 1;
+fi
+
+re='^[0-9]+$'
+if ! [[ $THREADS =~ $re ]] ; then
+   echo "error: -s '$THREADS' Not a number";
+   exit 1;
+fi
+
+if [ -z ${MAX_MEM+x} ]; then 
+	echo "error: missing variable -i INPUT" ;
+	exit 1;
+fi
+
+if [ -z ${MARK_DUPLICATE+x} ]; then 
+	echo "error: missing variable -p MARK_DUPLICATE" ;
+	exit 1;
+fi
+
+if [ ! -f $MARK_DUPLICATE ]; then
 	usage
-    echo "error: '$GENOME' not exists.";
+    echo "error: '$MARK_DUPLICATE' not exists.";
 	exit 1
 fi
 
-mkdir $PREFIX\_tmp
 
-echo "Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 
+if [ -z ${GENOME+x} ]; then 
+	echo "error: missing variable -g GENOME";
+	exit 1;
+fi
+
+if [ ! -f $GENOME ]; then
+	usage
+    echo "error: '$MARK_DUPLICATE' not exists.";
+	exit 1
+fi
+
+
+echo $0 $* 2>&1 | tee $PREFIX.log 
+echo 2>&1 | tee -a $PREFIX.log
+echo THREADS=$THREADS 2>&1 | tee -a $PREFIX.log
+echo MAX_MEM_USAGE=$MAX_MEM 2>&1 | tee -a $PREFIX.log
+echo INPUT=$INPUT 2>&1 | tee -a $PREFIX.log
+echo MARK_DUPLICATE=$MARK_DUPLICATE 2>&1 | tee -a $PREFIX.log
+echo PREFIX=$PREFIX 2>&1 | tee -a $PREFIX.log
+echo GENOME=$GENOME 2>&1 | tee -a $PREFIX.log
+
+
+echo 2>&1 | tee -a $PREFIX.log
+
+if [ ! -d $PREFIX\_tmp ]; then
+	mkdir $PREFIX\_tmp
+fi
+
+echo "Step1. map reads and filter non-uniquely mapped reads" 2>&1 | tee -a $PREFIX.log
 if [ ${INPUT: -4} == ".bz2" ];
 then
 	bwa mem -t $THREADS $GENOME <(bzip2 -dc $INPUT) 2> $PREFIX\_tmp/$PREFIX.bwa.log | \
@@ -95,17 +134,45 @@ else
 		samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam
 fi
 
-echo "sort reads based on genomic coordiantes"
+echo "sort reads based on genomic coordiantes" 2>&1 | tee -a $PREFIX.log
 samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.bam $PREFIX\_tmp/$PREFIX.uniq.sorted
+# rm $PREFIX\_tmp/$PREFIX.uniq.bam
 
-echo "remove PCR duplications"
-java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.bam OUTPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
+echo "remove PCR duplications" 2>&1 | tee -a $PREFIX.log
+java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.bam OUTPUT=$PREFIX.bam ASSUME_SORTED=true \
+	REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
 
-echo "create genome size"
-samtools view -H $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam  | awk '$1 == "@SQ" {OFS="\t";print $2,$3}' - | sed 's/.N://g' > $PREFIX\_tmp/genome.txt
+echo "create genome size" 2>&1 | tee -a $PREFIX.log
+samtools view -H $PREFIX.bam  | awk '$1 == "@SQ" {OFS="\t";print $2,$3}' - | sed 's/.N://g' > $PREFIX\_tmp/genome.txt
 
-echo "create bigwig file"
-samtools view -b $PREFIX\_tmp/$PREFIX.uniq.sorted.nodup.bam | bamToBed | slopBed -s -l 0 -r 250 -i stdin -g $PREFIX\_tmp/genome.txt | \
-    genomeCoverageBed -g $PREFIX\_tmp/genome.txt -i stdin -bg | wigToBigWig stdin $PREFIX\_tmp/genome.txt $PREFIX.uniq.sorted.nodup.bw;
+echo "create bigwig file" 2>&1 | tee -a $PREFIX.log
+samtools view -b $PREFIX.bam | bamToBed | slopBed -s -l 0 -r 300 -i stdin -g $PREFIX\_tmp/genome.txt | \
+    genomeCoverageBed -g $PREFIX\_tmp/genome.txt -i stdin -bg | wigToBigWig stdin $PREFIX\_tmp/genome.txt $PREFIX.bw;
+
+echo "Summerizing ..." 2>&1 | tee -a $PREFIX.log
+if [ ${INPUT: -4} == ".bz2" ];
+then
+	TOTAL_READS=$(bzcat $INPUT | wc -l | awk '{print $1}')
+elif [ ${INPUT: -3} == ".gz" ]
+then
+	TOTAL_READS=$(zcat $INPUT | wc -l | awk '{print $1}') 
+else
+	TOTAL_READS=$(wc -l $INPUT | awk '{print $1}') 
+fi
+
+UNIQ_READS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.bam | wc -l | awk '{print $1}')
+MONO_READS=$(samtools view $PREFIX.bam | wc -l | awk '{print $1}')
+
+
+echo "================================ Summary ==================================" 2>&1 | tee -a $PREFIX.log
+echo "total number of reads = $((TOTAL_READS/4))" 2>&1 | tee -a $PREFIX.log
+echo "uniquely mapped reads (MAPQ>10) = $UNIQ_READS" 2>&1 | tee -a $PREFIX.log
+echo "monoclonal reads = $MONO_READS" 2>&1 | tee -a $PREFIX.log
+
+echo "cleaning up" >&1 | tee -a $PREFIX.log
+# rm $PREFIX\_tmp/
+
+echo "Done" | tee -a $PREFIX.log
+
 
 

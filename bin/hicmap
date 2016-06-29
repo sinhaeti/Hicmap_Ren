@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 set -e
 # PART I check weather softwares installed
 command -v bwa >/dev/null 2>&1 || { echo >&2 "hicmap requires bwa but it's not installed.  Aborting."; exit 1; }
@@ -9,7 +10,7 @@ usage(){
 cat << EOF
 
 Program: hicmap (Hi-C analysis pipeline)
-Version: 12.17-r15
+Version: v06.29.2016
 Contact: Rongxin Fang <r3fang@ucsd.edu>
 Lab: http://bioinformatics-renlab.ucsd.edu/rentrac/
 
@@ -23,18 +24,18 @@ Map and processing Hi-C reads
 usage: hicmap [-h] [-t THREADS] [-f FASTQ1] [-r FASTQ2] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
 
 Example:
-hicmap -t 10 -f data/demo_R1.fastq.bz2 -r data/demo_R2.fastq.bz2 -p Picard/MarkDuplicates.jar -n demo -g /mnt/thumper/home/r3fang/data/Mus_musculus/UCSC/mm9/Sequence/BWAIndex/genome.fa -c mm9.MboI.bed -d 10000
+hicmap -t 5 -f data/demo_R1.fastq.bz2 -r data/demo_R2.fastq.bz2 -p Picard/MarkDuplicates.jar -n demo -g mm9.fa -c mm9.MboI.bed -d 10000
 
 Options:    
 	-h, --help           show this help message and exit.
 	-t  THREADS          threads [1].
-	-f  FASTQ1           first mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
-	-r  FASTQ2           second mate of pair-end sequencing data [.fq/.fastq/.gz/.bz2].
-	-p  MARK_DUPLICATE   path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
+	-f  FASTQ1           first mate of pair-end sequencing data  [.fq|.gz|.bz2].
+	-r  FASTQ2           second mate of pair-end sequencing data [.fq|.gz|.bz2].
+	-p  MARK_DUPLICATE   path to picard MarkDuplicates.jar [Picard/MarkDuplicates.jar].
 	-n  NAME             prefix of output files.
 	-g  BWA_GENOME       BWA indexed reference genome.
 	-c  CUT_ENZ          restriction cutting enzyme files. 
-	-d  MIN_INSERT_SIZE  min insert size for valid "DIFFERENT-STRAND" pairs.
+	-d  MIN_INSERT_SIZE  pairs with distance smaller that MIN_INSERT_SIZE will be filtered [10,000].
 
 Note: hicmap will requires at least 2GB memory usage.
 EOF
@@ -44,6 +45,7 @@ EOF
 
 # PART III default params
 THREADS=1
+MIN_INSERT_SIZE=10000
 
 # PART IV receiving arguments
 while getopts ":t:f:r:p:n:g:c:d:" opt;

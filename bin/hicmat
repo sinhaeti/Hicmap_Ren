@@ -46,7 +46,6 @@ def main():
 
 
     outfile = options.OUTPUT    
-    
     # generate the map
     max_bin = 0
     map_dict = {}
@@ -69,6 +68,7 @@ def main():
         bins.append((key[0], key[1] + 1, key[1] + bin_size - 1))
         bins.append((key[0], key[2] + 1, key[2] + bin_size - 1))
         fout_count.write("\t".join([_bin1, _bin2, str(map_dict[key]), "\n"]))
+        print _bin1
     fout_count.close()
     
     

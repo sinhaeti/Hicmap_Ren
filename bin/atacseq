@@ -93,7 +93,7 @@ if ! [[ $THREADS =~ $re ]] ; then
 fi
 
 if [ -z ${MAX_MEM+x} ]; then 
-	echo "error: missing variable -i INPUT" ;
+	echo "error: missing variable -m MAX_MEM" ;
 	exit 1;
 fi
 
@@ -125,10 +125,10 @@ echo $0 $* 2>&1 | tee $PREFIX.log
 echo 2>&1 | tee -a $PREFIX.log
 echo THREADS=$THREADS 2>&1 | tee -a $PREFIX.log
 echo MAX_MEM_USAGE=$MAX_MEM 2>&1 | tee -a $PREFIX.log
+echo PREFIX=$PREFIX 2>&1 | tee -a $PREFIX.log
 echo R1=$FASTQ1 2>&1 | tee -a $PREFIX.log
 echo R2=$FASTQ2 2>&1 | tee -a $PREFIX.log
 echo MARK_DUPLICATE=$MARK_DUPLICATE 2>&1 | tee -a $PREFIX.log
-echo PREFIX=$PREFIX 2>&1 | tee -a $PREFIX.log
 echo GENOME=$GENOME 2>&1 | tee -a $PREFIX.log
 
 
@@ -138,7 +138,7 @@ if [ ! -d $PREFIX\_tmp ]; then
 	mkdir $PREFIX\_tmp
 fi
 
-echo -ne '#                         (5%)\r'
+echo -ne '#                         (1 %)\r'
 echo "Step1. map reads and filter non-uniquely mapped reads" >> $PREFIX.log
 if [ ${FASTQ1: -4} == ".bz2" ];
 then
@@ -149,30 +149,31 @@ else
 		samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam
 fi
 
-echo -ne '##########                (50%)\r'
+echo -ne '################          (60 %)\r'
 echo "Step2. sort reads based on genomic coordiantes" >> $PREFIX.log
 samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.bam $PREFIX\_tmp/$PREFIX.uniq.sorted
 
-echo -ne '##############            (70%)\r'
+echo -ne '##################        (70 %)\r'
 echo "Step3. remove PCR duplications"  >> $PREFIX.log
 java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.bam OUTPUT=$PREFIX.bam ASSUME_SORTED=true \
-	REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
+	REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp > /dev/null 2>&1
 
-echo -ne '######################    (90%)\r'
-echo "Step4. create bigwig file" 2>&1 | tee -a $PREFIX.log
+echo -ne '####################      (75 %)\r'
+echo "Step4. create bigwig file" >> $PREFIX.log
 samtools view -H $PREFIX.bam  | awk '$1 == "@SQ" {OFS="\t";print $2,$3}' - | sed 's/.N://g' > $PREFIX\_tmp/genome.txt
 samtools view -b $PREFIX.bam | bamToBed | slopBed -s -l 0 -r 300 -i stdin -g $PREFIX\_tmp/genome.txt | \
     genomeCoverageBed -g $PREFIX\_tmp/genome.txt -i stdin -bg | wigToBigWig stdin $PREFIX\_tmp/genome.txt $PREFIX.bw;
 
+echo -ne '######################   (80 %)\r'
 echo "Step4. summerizing ..." >> $PREFIX.log
-if [ ${INPUT: -4} == ".bz2" ];
+if [ ${FASTQ1: -4} == ".bz2" ];
 then
-	TOTAL_READS=$(bzcat $INPUT | wc -l | awk '{print $1}')
-elif [ ${INPUT: -3} == ".gz" ]
+	TOTAL_READS=$(bzcat $FASTQ1 | wc -l | awk '{print $1}')
+elif [ ${FASTQ1: -3} == ".gz" ]
 then
-	TOTAL_READS=$(zcat $INPUT | wc -l | awk '{print $1}') 
+	TOTAL_READS=$(zcat $FASTQ1 | wc -l | awk '{print $1}') 
 else
-	TOTAL_READS=$(wc -l $INPUT | awk '{print $1}') 
+	TOTAL_READS=$(wc -l $FASTQ1 | awk '{print $1}') 
 fi
 
 UNIQ_READS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.bam | wc -l | awk '{print $1}')
@@ -185,5 +186,5 @@ echo "monoclonal reads = $MONO_READS" >> $PREFIX.log
 
 echo "cleaning up" >> $PREFIX.log
 rm -r $PREFIX\_tmp/
-echo -ne '##########################(100%)\r'
+echo -ne '######################### (100 %)\n'
 echo "Succeed!" | tee -a $PREFIX.log

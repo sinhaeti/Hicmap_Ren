@@ -24,8 +24,8 @@ Options:
 	-h, --help           show this help message and exit.
 	-t  THREADS          threads [<5].
 	-m  MAX_MEM          max memory usage [<5GB].
-	-f  INPUT            R1 reads [.gz|fastq|.bz2].
-	-r  INPUT            R2 reads [.gz|fastq|.bz2].
+	-f  FASTQ1           R1 reads [.gz|fastq|.bz2].
+	-r  FASTQ2           R2 reads [.gz|fastq|.bz2].
 	-p  MARK_DUPLICATE   path to picard MarkDuplicates.jar [bin/MarkDuplicates.jar].
 	-n  NAME             prefix of output files.
 	-g  BWA_GENOME       BWA indexed reference genome.
@@ -175,7 +175,6 @@ fi
 
 UNIQ_READS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.bam | wc -l | awk '{print $1}')
 MONO_READS=$(samtools view $PREFIX.bam | wc -l | awk '{print $1}')
-
 
 echo "================================ Summary ==================================" 2>&1 | tee -a $PREFIX.log
 echo "total number of reads = $((TOTAL_READS/4))" 2>&1 | tee -a $PREFIX.log

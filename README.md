@@ -1,6 +1,6 @@
 ##Get Started     
 ```bash
-$ git clone --recursive https://github.com/r3fang/Hicmap_Ren.git
+$ git clone --recursive --depth=1 https://github.com/r3fang/Hicmap_Ren.git
 $ cd Hicmap_Ren
 $ bash install.sh
 $ # download demo HiC data (Dixon 2016)

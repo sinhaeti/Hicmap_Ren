@@ -138,7 +138,8 @@ if [ ! -d $PREFIX\_tmp ]; then
 	mkdir $PREFIX\_tmp
 fi
 
-echo "Step1. map reads and filter non-uniquely mapped reads" 2>&1 | tee -a $PREFIX.log
+echo -ne '#                         (5%)\r'
+echo "Step1. map reads and filter non-uniquely mapped reads" >> $PREFIX.log
 if [ ${FASTQ1: -4} == ".bz2" ];
 then
 	bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ1) <(bzip2 -dc $FASTQ2) 2> $PREFIX\_tmp/$PREFIX.bwa.log | \
@@ -148,21 +149,22 @@ else
 		samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX.uniq.bam
 fi
 
-echo "sort reads based on genomic coordiantes" 2>&1 | tee -a $PREFIX.log
+echo -ne '##########                (50%)\r'
+echo "Step2. sort reads based on genomic coordiantes" >> $PREFIX.log
 samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.bam $PREFIX\_tmp/$PREFIX.uniq.sorted
 
-echo "remove PCR duplications" 2>&1 | tee -a $PREFIX.log
+echo -ne '##############            (70%)\r'
+echo "Step3. remove PCR duplications"  >> $PREFIX.log
 java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.sorted.bam OUTPUT=$PREFIX.bam ASSUME_SORTED=true \
 	REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
 
-echo "create genome size" 2>&1 | tee -a $PREFIX.log
+echo -ne '######################    (90%)\r'
+echo "Step4. create bigwig file" 2>&1 | tee -a $PREFIX.log
 samtools view -H $PREFIX.bam  | awk '$1 == "@SQ" {OFS="\t";print $2,$3}' - | sed 's/.N://g' > $PREFIX\_tmp/genome.txt
-
-echo "create bigwig file" 2>&1 | tee -a $PREFIX.log
 samtools view -b $PREFIX.bam | bamToBed | slopBed -s -l 0 -r 300 -i stdin -g $PREFIX\_tmp/genome.txt | \
     genomeCoverageBed -g $PREFIX\_tmp/genome.txt -i stdin -bg | wigToBigWig stdin $PREFIX\_tmp/genome.txt $PREFIX.bw;
 
-echo "Summerizing ..." 2>&1 | tee -a $PREFIX.log
+echo "Step4. summerizing ..." >> $PREFIX.log
 if [ ${INPUT: -4} == ".bz2" ];
 then
 	TOTAL_READS=$(bzcat $INPUT | wc -l | awk '{print $1}')
@@ -176,14 +178,12 @@ fi
 UNIQ_READS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.bam | wc -l | awk '{print $1}')
 MONO_READS=$(samtools view $PREFIX.bam | wc -l | awk '{print $1}')
 
-echo "================================ Summary ==================================" 2>&1 | tee -a $PREFIX.log
-echo "total number of reads = $((TOTAL_READS/4))" 2>&1 | tee -a $PREFIX.log
-echo "uniquely mapped reads (MAPQ>10) = $UNIQ_READS" 2>&1 | tee -a $PREFIX.log
-echo "monoclonal reads = $MONO_READS" 2>&1 | tee -a $PREFIX.log
+echo "================================ Summary ==================================" >> $PREFIX.log
+echo "total number of reads = $((TOTAL_READS/4))" >> $PREFIX.log
+echo "uniquely mapped reads (MAPQ>10) = $UNIQ_READS" >> $PREFIX.log
+echo "monoclonal reads = $MONO_READS" >> $PREFIX.log
 
-echo "cleaning up" >&1 | tee -a $PREFIX.log
+echo "cleaning up" >> $PREFIX.log
 rm -r $PREFIX\_tmp/
+echo -ne '##########################(100%)\r'
 echo "Succeed!" | tee -a $PREFIX.log
-
-
-

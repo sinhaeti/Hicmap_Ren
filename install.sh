@@ -2,7 +2,6 @@
 set -e
 
 cd htslib/
-./configure    # Optional, needed for choosing optional functionality
 make
 cd ../
 gcc -I htslib -L htslib src/pair2mates.c src/utils.c htslib/libhts.a -lz -lpthread -o bin/pair2mates

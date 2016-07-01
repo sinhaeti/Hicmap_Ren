@@ -12,4 +12,8 @@ chmod +x bin/atacseq
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo "export PATH=\$PATH:$DIR/bin" >> ~/.bash_profile
+<<<<<<< HEAD
+=======
+echo "export R_LIBS=$R_LIBS" >> ~/.bash_profile
+>>>>>>> 837a71110af165940d826cc42dfead26708f8b53
 bash ~/.bash_profile

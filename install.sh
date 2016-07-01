@@ -6,3 +6,4 @@ gcc -I htslib -L htslib src/pair2mates.c src/utils.c htslib/libhts.a -lz -lpthre
 chmod +x bin/hicmap
 chmod +x bin/chimeric.pl
 chmod +x bin/chipseq
+chmod +x bin/atacseq

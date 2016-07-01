@@ -3,7 +3,6 @@
 $ git clone --recursive https://github.com/r3fang/Hicmap_Ren.git
 $ cd Hicmap_Ren
 $ bash install.sh
-$ export PATH=$PATH:/path/to/Hicmap_Ren/bin
 $ # download demo HiC data (Dixon 2016)
 $ wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/demo_R1.fastq.bz2
 $ wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/demo_R2.fastq.bz2

@@ -102,12 +102,16 @@ if [ -z ${MARK_DUPLICATE+x} ]; then
 	exit 1;
 fi
 
+if [ -z ${PREFIX+x} ]; then 
+	echo "error: missing variable -n PREFIX" ;
+	exit 1;
+fi
+
 if [ ! -f $MARK_DUPLICATE ]; then
 	usage
     echo "error: '$MARK_DUPLICATE' not exists.";
 	exit 1
 fi
-
 
 if [ -z ${GENOME+x} ]; then 
 	echo "error: missing variable -g GENOME";

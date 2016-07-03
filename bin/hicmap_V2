@@ -170,7 +170,7 @@ if [ ! -d $PREFIX\_tmp ]; then
 fi
 
 echo "$(date) Step1. mapping and filtering reads ..." 2>&1 | tee -a $PREFIX.log
-if [ ! -f $PREFIX\_tmp/$PREFIX.paired.uniq.filtered.bam ]; then
+if [ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam ]; then
 	if [ ${FASTQ1: -4} == ".bz2" ];
 	then
 		bwa mem -t $((THREADS / 2)) $GENOME <(bzcat -dc $FASTQ1) 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | chimeric.pl - > $TMP1 &		
@@ -184,8 +184,11 @@ else
 	printf 'warning: %s_tmp/%s.paired.uniq.filtered.bam already exists.\n' "$PREFIX" "$PREFIX" 2>&1 | tee -a $PREFIX.log
 fi
 
-hicmap_pair_up_filterr -f $TMP1 -r $TMP2 | samtools view -h -L $CUTTER_SITES - | hicmap_cutter_sites_filter - | samtools view -bS - > $PREFIX\_tmp/$PREFIX.paired.uniq.filtered.bam
-wait
+hicmap_pair_up_filter -f $TMP1 -r $TMP2 2>>$PREFIX.log \
+	| samtools view -h -L $CUTTER_SITES - \
+		| hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>>$PREFIX.log \
+			| samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
+
 
 #echo 
 #echo "$(date) Step2. filter reads that are  > 500bp far from restriction cutter sites" 2>&1 | tee -a $PREFIX.log

@@ -39,7 +39,7 @@ def main():
     CIS_LONG_NUM_READS = 0
     
     parser = optparse.OptionParser(description='pair up HiC two mates and only keep unuquely mapped cis pairs.', 
-                                usage='%prog [-h] [-f SAM1] [-r SAM2] [-d MIN_INSERT_SIZE]')
+                                usage='%prog [-h] [-f SAM1] [-r SAM2]')
     
     parser.add_option('-f',
                       dest="SAM1",
@@ -49,13 +49,7 @@ def main():
                       dest="SAM2",
                       help='R2 alignments in .sam format.'
                       )
-    parser.add_option('-d',
-                      dest="MIN_INSERT_SIZE",
-                      type=int,
-                      help='min intersert distance for long-range reads.'
-                      )
     
-    DIST_CUTOFF = 10000
     options, remainder = parser.parse_args()
     if options.SAM1:
         fin_r1_name = options.SAM1
@@ -69,10 +63,8 @@ def main():
         parser.print_help()
         exit('error: missing -r arguments;')
 
-    if options.MIN_INSERT_SIZE: DIST_CUTOFF = options.MIN_INSERT_SIZE
     if not os.path.isfile(fin_r1_name): exit('error: file %s not exist;' % fin_r1_name)
     if not os.path.isfile(fin_r2_name): exit('error: file %s not exist;' % fin_r2_name)
-    
     
     fin1 = open(fin_r1_name, 'r')
     fin2 = open(fin_r2_name, 'r')
@@ -112,7 +104,7 @@ def main():
                         aln2.flag = 147
                         aln1.chrom2 = "="
                         aln2.chrom2 = "="
-                        aln1.pos2 = aln2.pos1
+                        aln1.pos2 = aln2.pos1 
                         aln2.pos2 = aln1.pos1
                         aln1.insert_size =  aln2.pos1 - aln1.pos1
                         aln2.insert_size =  aln1.pos1 - aln2.pos1
@@ -125,7 +117,6 @@ def main():
                         aln2.pos2 = aln1.pos1
                         aln1.insert_size =  aln2.pos1 - aln1.pos1
                         aln2.insert_size =  aln1.pos1 - aln2.pos1
-                    if aln1.insert_size >= DIST_CUTOFF: CIS_LONG_NUM_READS += 1
                     try:
                         print aln1.aln_str()
                         print aln2.aln_str()
@@ -138,14 +129,13 @@ def main():
                             sys.stderr.close()
                         except IOError:
                             pass
-                    continue                           
+
     fin1.close()
     fin2.close()
     print  >>sys.stderr, "number of total sequenced pairs: ", TOTAL_NUM_READS
     print  >>sys.stderr, "number of uniquely mapped pairs: ", PAIR_NUM_READS
     print  >>sys.stderr, "number of trans reads: ", TRANS_NUM_READS
     print  >>sys.stderr, "number of cis reads: ", CIS_NUM_READS
-    print  >>sys.stderr, "number of long-range cis reads: ", CIS_LONG_NUM_READS
     
 if __name__ == '__main__':
     main()

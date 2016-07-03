@@ -189,6 +189,9 @@ hicmap_pair_up_filter -f $TMP1 -r $TMP2 2>>$PREFIX.log \
 		| hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>>$PREFIX.log \
 			| samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
 
+samtools sort -m 2G $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted
+rm $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
+
 
 #echo 
 #echo "$(date) Step2. filter reads that are  > 500bp far from restriction cutter sites" 2>&1 | tee -a $PREFIX.log

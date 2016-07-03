@@ -63,18 +63,17 @@ def main():
         parser.print_help()
         exit('error: missing -r arguments;')
 
-    if not os.path.isfile(fin_r1_name): exit('error: file %s not exist;' % fin_r1_name)
-    if not os.path.isfile(fin_r2_name): exit('error: file %s not exist;' % fin_r2_name)
-    
-    fin1 = open(fin_r1_name, 'r')
-    fin2 = open(fin_r2_name, 'r')
+    if not os.path.exists(fin_r1_name): exit('error: file %s not exist;' % fin_r1_name)
+    if not os.path.exists(fin_r2_name): exit('error: file %s not exist;' % fin_r2_name)
+
+    fin1 = open(fin_r1_name, "r")
+    fin2 = open(fin_r2_name, "r")
     pattern1=re.compile("@SQ\s+SN:chr[0-9a-zA-Z_]*\s+")
     pattern2=re.compile("@PG\s+ID:bwa\s+")
     while True:
         line1 = fin1.readline()
         line2 = fin2.readline()
         if line1 == "": break
-        # head of bam file
         if (re.search(pattern1, line1) != None) or (re.search(pattern2, line1) != None):
             try:
                 print line1,
@@ -129,6 +128,7 @@ def main():
                             sys.stderr.close()
                         except IOError:
                             pass
+                    continue
 
     fin1.close()
     fin2.close()

@@ -42,7 +42,7 @@ MIN_INSERT_SIZE=10000
 MAX_MEM="2G"
 
 # PART IV receiving arguments
-while getopts ":t:m:f:r:p:n:g:c:i:" opt;
+while getopts "t:m:f:r:p:n:g:c:i:s" opt;
 do
 	case "$opt" in
 		t) THREADS=$OPTARG;;
@@ -54,6 +54,7 @@ do
 		g) GENOME=$OPTARG;;
 		c) CUT_ENZ=$OPTARG;;
 		i) MIN_INSERT_SIZE=$OPTARG;;
+		s) SHORT="YES";;
 		\?) usage
 			echo "error: unrecognized option -$OPTARG";
 			exit 1
@@ -66,7 +67,6 @@ if [ $# -lt 12 ] ; then
    echo "error: too few arguments"
    exit 1
 fi
-
 
 # check if varaibles exist
 [ -z ${THREADS+x} ] && { echo "error: missing variable -t argument"; exit 1; }
@@ -139,31 +139,45 @@ java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.paired.ci
 [ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam ] && { echo -e "Step3 failed. Aborting."; exit 1;}
 rm $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam
 
-echo "$(date) Step4. split reads into long/short-range reads ..." 
+echo "$(date) Step4. select long-range cis nodup pairs ..." 
 samtools view -h $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam \
 	| awk -v var="$MIN_INSERT_SIZE" 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) >= var) print }' \
 		| samtools view -bS - > $PREFIX.long.bam &
 ip_long=$!
-samtools view -h $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam \
-	| awk -v var="$MIN_INSERT_SIZE" 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) < var) print }' \
-		| samtools view -bS - > $PREFIX.short.bam &
-ip_short=$!
+
+if [ ! -z ${SHORT+x} ] 
+then 
+	samtools view -h $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam \
+		| awk -v var="$MIN_INSERT_SIZE" 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) < var) print }' \
+			| samtools view -bS - > $PREFIX.short.bam &
+	ip_short=$!
+fi
 
 while kill -0 $ip_long 2>/dev/null
 do
   sleep 1
 done
-while kill -0 $ip_short 2>/dev/null
-do
-  sleep 1
-done
 
-[ ! -f $PREFIX.short.bam  ] || [ ! -s $PREFIX.short.bam  ] && { echo -e "Step4 failed. Aborting."; exit 1;}
+if [ ! -z ${SHORT+x} ] 
+then 
+	while kill -0 $ip_short 2>/dev/null
+	do
+	  sleep 1
+	done
+fi
+
+
 [ ! -f $PREFIX.long.bam  ] || [ ! -s $PREFIX.long.bam  ] && { echo -e "Step4 failed. Aborting."; exit 1;}
 
 echo -e "$(date) Step5. indexing $PREFIX.long.bam and $PREFIX.short.bam ..." 
 samtools index $PREFIX.long.bam
-samtools index $PREFIX.short.bam
+
+if [ ! -z ${SHORT+x} ] 
+then 
+	[ ! -f $PREFIX.short.bam  ] || [ ! -s $PREFIX.short.bam  ] && { echo -e "Step4 failed. Aborting."; exit 1;}
+	samtools index $PREFIX.short.bam
+fi
+
 
 echo -e "$(date) Step6. summerizing and cleaning up ..." 
 UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP=$(samtools view $PREFIX.long.bam | wc -l | awk '{print $1}')

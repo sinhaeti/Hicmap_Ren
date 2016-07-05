@@ -6,3 +6,4 @@ wrapper.sh
 bedGraphToBigWig
 tmp*
 demo*
+bin/hicmap_V2

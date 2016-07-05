@@ -68,6 +68,7 @@ def main():
 
     fin1 = open(fin_r1_name, "r")
     fin2 = open(fin_r2_name, "r")
+
     pattern1=re.compile("@SQ\s+SN:chr[0-9a-zA-Z_]*\s+")
     pattern2=re.compile("@PG\s+ID:bwa\s+")
     while True:
@@ -91,12 +92,12 @@ def main():
             TOTAL_NUM_READS += 1
             aln1 = sam_alignment(line1)
             aln2 = sam_alignment(line2)
-            if aln1.name != aln2.name: exit('error: hicmap_pair_up R1 and R2 read names not match;')
-            if(aln1.score >= 10 & aln2.score >= 10):
+            if aln1.name != aln2.name: exit('error: hicmap_pair_up R1 and R2 read names not match;')            
+            if(aln1.score >= 10 and aln2.score >= 10):
                 PAIR_NUM_READS += 1
                 if aln1.chrom1 !=  aln2.chrom1: 
                     TRANS_NUM_READS += 1
-                if aln1.chrom1 ==  aln2.chrom1:
+                else:
                     CIS_NUM_READS += 1
                     if aln1.flag == aln2.flag:
                         aln1.flag = 99
@@ -127,15 +128,13 @@ def main():
                         try:
                             sys.stderr.close()
                         except IOError:
-                            pass
-                    continue
-
+                            pass    
     fin1.close()
     fin2.close()
-    print  >>sys.stderr, "number of total sequenced pairs: ", TOTAL_NUM_READS
+    print  >>sys.stderr, "number of totally sequenced pairs: ", TOTAL_NUM_READS
     print  >>sys.stderr, "number of uniquely mapped pairs: ", PAIR_NUM_READS
-    print  >>sys.stderr, "number of trans reads: ", TRANS_NUM_READS
-    print  >>sys.stderr, "number of cis reads: ", CIS_NUM_READS
+    print  >>sys.stderr, "number of cis pairs: ", CIS_NUM_READS
+    #print  >>sys.stderr, "number of trans pairs: ", TRANS_NUM_READS
     
 if __name__ == '__main__':
     main()

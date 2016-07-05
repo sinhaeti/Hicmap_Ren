@@ -93,7 +93,6 @@ if ! [[ $THREADS =~ $re ]] ; then
    exit 1
 fi
 
-
 echo $0 $* 2>&1 | tee $PREFIX.log 
 echo 2>&1 | tee -a $PREFIX.log
 echo THREADS=$THREADS 2>&1 | tee -a $PREFIX.log
@@ -108,32 +107,34 @@ echo MIN_INSERT_SIZE=$MIN_INSERT_SIZE 2>&1 | tee -a $PREFIX.log
 echo 2>&1 | tee -a $PREFIX.log
 
 
-if [ ! -d $PREFIX\_tmp ]; then
-	mkdir $PREFIX\_tmp
+if [ -d $PREFIX\_tmp ]; then
+	rm -r $PREFIX\_tmp
 fi
+mkdir $PREFIX\_tmp
 
-echo "$(date) Step1. mapping and pairing and filtering reads ..." 2>&1 | tee -a $PREFIX.log
+
+echo "$(date) Step1. mapping and pairing and filtering reads ..." 
 if [ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam ]; then
 	if [ ${FASTQ1: -4} == ".bz2" ];
 	then
-		hicmap_pair_up_filter -f <(bwa mem -t $((THREADS / 2)) $GENOME <(bzcat -dc $FASTQ1) 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | chimeric.pl -) -r <(bwa mem -t $((THREADS / 2)) $GENOME <(bzcat -dc $FASTQ2) 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | chimeric.pl -) 2>&1 | tee -a $PREFIX.log \
-			| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>&1 | tee -a $PREFIX.log | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
+		hicmap_pair_up_filter -f <(bwa mem -t $((THREADS / 2)) $GENOME <(bzcat -dc $FASTQ1) 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | chimeric.pl -) -r <(bwa mem -t $((THREADS / 2)) $GENOME <(bzcat -dc $FASTQ2) 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | chimeric.pl -) 2>>$PREFIX.log \
+			| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>> $PREFIX.log | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
 	else
-		hicmap_pair_up_filter -f <(bwa mem -t $((THREADS / 2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | chimeric.pl -) -r <(bwa mem -t $((THREADS / 2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | chimeric.pl -) 2>&1 | tee -a $PREFIX.log \
-			| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>&1 | tee -a $PREFIX.log | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
+		hicmap_pair_up_filter -f <(bwa mem -t $((THREADS / 2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | chimeric.pl -) -r <(bwa mem -t $((THREADS / 2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | chimeric.pl -) 2>>$PREFIX.log \
+			| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>>$PREFIX.log | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
 	fi
 else
-	printf 'warning: %s_tmp/%s.uniq.paired.cis.filtered.bam already exists.\n' "$PREFIX" "$PREFIX" 2>&1 | tee -a $PREFIX.log
+	printf 'warning: %s_tmp/%s.uniq.paired.cis.filtered.bam already exists.\n' "$PREFIX" "$PREFIX" 
 fi
 [ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam ] && { echo -e "Step1 failed. Aborting."; exit 1;}
 
 
-echo "$(date) Step2. sorting based on genomic coordinates ..." 2>&1 | tee -a $PREFIX.log
+echo "$(date) Step2. sorting based on genomic coordinates ..." 
 samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted
 rm $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
 [ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam ] && { echo -e "Step2 failed. Aborting."; exit 1;}
 
-echo "$(date) Step3. split reads into long/short-range reads ..." 2>&1 | tee -a $PREFIX.log
+echo "$(date) Step3. split reads into long/short-range reads ..." 
 samtools view -h $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam \
 	| awk -v var="$MIN_INSERT_SIZE" 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) >= var) print }' \
 		| samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.long.bam &
@@ -146,102 +147,27 @@ while kill -0 $! 2>/dev/null
 do
   sleep 1
 done
+
 [ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.short.bam  ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.short.bam  ] && { echo -e "Step3 failed to generate short-range reads. Aborting."; exit 1;}
 [ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.long.bam  ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.long.bam  ] && { echo -e "Step3 failed to generate long-range reads. Aborting."; exit 1;}
 rm $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam
 
 
-echo -e "$(date) Step4. remove PCR duplications ..." 2>&1 | tee -a $PREFIX.log
+echo -e "$(date) Step4. remove PCR duplications ..." 
 java -Xmx2G -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.long.bam  OUTPUT=$PREFIX.long.bam   ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.long.txt  TMP_DIR=$PREFIX\_tmp  &
 java -Xmx2G -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.short.bam OUTPUT=$PREFIX.short.bam  ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.short.txt TMP_DIR=$PREFIX\_tmp  &
-wait
+while kill -0 $! 2>/dev/null
+do
+  sleep 1
+done
 
-echo -e "$(date) Step5. indexing $PREFIX.long.bam and $PREFIX.short.bam..." 2>&1 | tee -a $PREFIX.log
+echo -e "$(date) Step5. indexing $PREFIX.long.bam and $PREFIX.short.bam..." 
 samtools index $PREFIX.long.bam
 samtools index $PREFIX.short.bam
 
-echo -e "$(date) Step6. summerizing and cleaning up." 2>&1 | tee -a $PREFIX.log
-UNIQ_PAIRED_CIS_FILTERED_SORTED_SHORT=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.short.bam | wc -l | awk '{print $1}')
-UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.long.bam | wc -l | awk '{print $1}')
-UNIQ_PAIRED_CIS_FILTERED_SORTED_SHORT_NODUP=$(samtools view $PREFIX.short.bam | wc -l | awk '{print $1}')
+echo -e "$(date) Step6. summerizing and cleaning up." 
 UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP=$(samtools view $PREFIX.long.bam | wc -l | awk '{print $1}')
-
-echo "number of short-range cis pairs after filtered by cutter cites $((UNIQ_PAIRED_CIS_FILTERED_SORTED_SHORT/2))" 2>&1 | tee -a $PREFIX.log
-echo "number of long-range cis pairs after filtered by cutter cites $((UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG/2))" 2>&1 | tee -a $PREFIX.log
-echo "number of unique short-range cis pairs $((UNIQ_PAIRED_CIS_FILTERED_SORTED_SHORT_NODUP/2))" 2>&1 | tee -a $PREFIX.log
 echo "number of unique long-range cis pairs after filtered by cutter cites $((UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP/2))" 2>&1 | tee -a $PREFIX.log
 
-#echo "uniquely mapped reads (MAPQ>10) for R1=$UNIQ_READS_R1 and R2=$UNIQ_READS_R2" 2>&1 | tee -a $PREFIX.log
-#echo "500bp closed to cutter sites for R1=$UNIQ_FILTERED_READS_R1 and R2=$UNIQ_FILTERED_READS_R2" 2>&1 | tee -a $PREFIX.log
-#echo "total number of paired trans-reads = $((UNIQ_FILTERED_PAIRED_READS_TRANS/2))" 2>&1 | tee -a $PREFIX.log
-#echo "total number of paired cis-reads = $((UNIQ_FILTERED_PAIRED_READS_CIS/2))" 2>&1 | tee -a $PREFIX.log
-#echo "total number of long-range cis-reads = $((UNIQ_FILTERED_PAIRED_READS_CIS_LONG/2))" 2>&1 | tee -a $PREFIX.log
-#echo "total number of non-dup long-range cis-reads = $((UNIQ_FILTERED_PAIRED_READS_CIS_LONG_NODUP/2))" 2>&1 | tee -a $PREFIX.log
-
-
-#echo 
-#echo "$(date) Step2. filter reads that are  > 500bp far from restriction cutter sites" 2>&1 | tee -a $PREFIX.log
-#if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam ] || [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam ]; 
-#then
-#	samtools view -b -L $CUT_ENZ $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam &
-#	samtools view -b -L $CUT_ENZ $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam &
-#	wait
-#	samtools sort -m 2G -n $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
-#	samtools sort -m 2G -n $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
-#	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam	
-#	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam	
-#fi
-#
-#echo
-#echo "$(date) Step4. pair up two ends and sort based on coordinates" 2>&1 | tee -a $PREFIX.log
-#if [ ! -f $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.sorted.bam ]; then
-#	pair2mates -m $MIN_INSERT_SIZE -o $PREFIX\_tmp/$PREFIX.uniq.filtered.paired $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam	
-#	samtools view -h $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.bam | awk 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) >= 10000) print }' | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.bam
-#	samtools sort -m 2G $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.bam $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.sorted
-#	rm $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.bam
-#else
-#	printf 'warning: %s_tmp/%s.uniq.filtered.paired.bam already exist.\n'  "$PREFIX" "$PREFIX" 2>&1 | tee -a $PREFIX.log
-#fi
-#
-#echo 
-#echo "$(date) Step6. Remove PCR duplication" 2>&1 | tee -a $PREFIX.log
-#if [ ! -f $PREFIX.uniq.filtered.paired.cis.longRange.sorted.nodup.bam ]; then
-#	java -Xmx2G -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.sorted.bam OUTPUT=$PREFIX.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
-#	samtools index $PREFIX.bam
-#else
-#	printf 'warning: %s_tmp/%s.uniq.filtered.paired.sorted.nodup.bam already exist.\n'  "$PREFIX" "$PREFIX" 2>&1 | tee -a $PREFIX.log
-#fi
-#
-#echo 
-#echo "$(date) Step7. Summerizing ..." 2>&1 | tee -a $PREFIX.log
-#if [ ${FASTQ1: -4} == ".bz2" ];
-#then
-#	TOTAL_READS=$(bzcat $FASTQ1 | wc -l | awk '{print $1}')
-#elif [ ${FASTQ1: -3} == ".gz" ]
-#then
-#	TOTAL_READS=$(zcat $FASTQ1 | wc -l | awk '{print $1}') 
-#else
-#	TOTAL_READS=$(wc -l $FASTQ1 | awk '{print $1}') 
-#fi
-#
-#UNIQ_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.bam | wc -l | awk '{print $1}') 
-#UNIQ_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.bam | wc -l | awk '{print $1}') 
-#UNIQ_FILTERED_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam | wc -l | awk '{print $1}') 
-#UNIQ_FILTERED_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam | wc -l | awk '{print $1}')
-#UNIQ_FILTERED_PAIRED_READS_CIS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.bam | wc -l | awk '{print $1}')
-#UNIQ_FILTERED_PAIRED_READS_TRANS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.trans.bam | wc -l | awk '{print $1}')
-#UNIQ_FILTERED_PAIRED_READS_CIS_LONG=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.sorted.bam | wc -l | awk '{print $1}')
-#UNIQ_FILTERED_PAIRED_READS_CIS_LONG_NODUP=$(samtools view $PREFIX.bam | wc -l | awk '{print $1}')
-#
-#echo "================================ Summary ==================================" 2>&1 | tee -a $PREFIX.log
-#echo "total number of reads = $((TOTAL_READS/4))" 2>&1 | tee -a $PREFIX.log
-#echo "uniquely mapped reads (MAPQ>10) for R1=$UNIQ_READS_R1 and R2=$UNIQ_READS_R2" 2>&1 | tee -a $PREFIX.log
-#echo "500bp closed to cutter sites for R1=$UNIQ_FILTERED_READS_R1 and R2=$UNIQ_FILTERED_READS_R2" 2>&1 | tee -a $PREFIX.log
-#echo "total number of paired trans-reads = $((UNIQ_FILTERED_PAIRED_READS_TRANS/2))" 2>&1 | tee -a $PREFIX.log
-#echo "total number of paired cis-reads = $((UNIQ_FILTERED_PAIRED_READS_CIS/2))" 2>&1 | tee -a $PREFIX.log
-#echo "total number of long-range cis-reads = $((UNIQ_FILTERED_PAIRED_READS_CIS_LONG/2))" 2>&1 | tee -a $PREFIX.log
-#echo "total number of non-dup long-range cis-reads = $((UNIQ_FILTERED_PAIRED_READS_CIS_LONG_NODUP/2))" 2>&1 | tee -a $PREFIX.log
-
-# clean up
-# rm -r $PREFIX\_tmp/
+#rm -r $PREFIX\_tmp/
 

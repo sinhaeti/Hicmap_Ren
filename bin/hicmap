@@ -14,51 +14,46 @@ Version: v06.29.2016
 Contact: Rongxin Fang <r3fang@ucsd.edu>
 Lab: http://bioinformatics-renlab.ucsd.edu/rentrac/
 
-Mapping Hi-C reads
-(1) indepedently map FASTQ1/FASTQ2 using BWA;
-(2) filter reads with MAPQ < 10;
-(3) filter reads far from restriction enzyme cutter sites (recommanded 1000bp centered at cutter sites);
-(4) pair up two ends and filter invalid hic pairs;
-(5) remove PCR duplication using Picard - MarkDuplicates;
-
-usage: hicmap [-h] [-t THREADS] [-f FASTQ1] [-r FASTQ2] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-m MIN_INSERT_SIZE]
+usage: hicmap [-h] [-t THREADS] [-m MAX_MEM] [-f FASTQ1] [-r FASTQ2] [-p MarkDuplicates.jar] [-n PREFIX] [-g BWA_GENOME] [-c CUT_SITES] [-i INSERT_SIZE]
 
 Example:
-hicmap -t 5 -f data/demo_R1.fastq.bz2 -r data/demo_R2.fastq.bz2 -p Picard/MarkDuplicates.jar -n demo -g mm9.fa -c mm9.MboI.bed -d 10000
+hicmap -f data/demo_R1.fastq.bz2 -r data/demo_R2.fastq.bz2 -p Picard/MarkDuplicates.jar -n demo -g mm9.fa -c mm9.MboI.bed
 
 Options:    
-	-h, --help           show this help message and exit.
-	-t  THREADS          threads to be used for BWA mapping [1].
+
+  -- required:
 	-f  FASTQ1           first mate of pair-end sequencing data  [.fq|.gz|.bz2].
 	-r  FASTQ2           second mate of pair-end sequencing data [.fq|.gz|.bz2].
 	-p  MARK_DUPLICATE   path to picard MarkDuplicates.jar [Picard/MarkDuplicates.jar].
 	-n  NAME             prefix of output files.
 	-g  BWA_GENOME       BWA indexed reference genome.
-	-c  CUT_ENZ          restriction cutting enzyme files. 
-	-d  MIN_INSERT_SIZE  pairs with distance smaller that MIN_INSERT_SIZE will be filtered [10,000].
+	-c  CUT_ENZ          restriction cutter sites files. 
+  -- optional:
+	-i  INSERT_SIZE      pairs with distance smaller that MIN_INSERT_SIZE will be filtered [10,000].
+	-t  INT              threads to be used for BWA mapping [2].
+	-m  MAX_MEM          max memory will be used for .bam sorting and MarkDuplicates.jar [2G].
 
-Note: hicmap will requires at least 2GB memory usage.
 EOF
 }
 
-# MEM_FREE=$(cat /proc/meminfo | grep MemFree | awk '{print $2}')	
-
 # PART III default params
-THREADS=1
+THREADS=2
 MIN_INSERT_SIZE=10000
+MAX_MEM="2G"
 
 # PART IV receiving arguments
-while getopts ":t:f:r:p:n:g:c:d:" opt;
+while getopts ":t:m:f:r:p:n:g:c:i:" opt;
 do
 	case "$opt" in
 		t) THREADS=$OPTARG;;
+		m) MAX_MEM=$OPTARG;;
 		f) FASTQ1=$OPTARG;;
 		r) FASTQ2=$OPTARG;;
 		p) MARK_DUPLICATE=$OPTARG;;
 		n) PREFIX=$OPTARG;;
 		g) GENOME=$OPTARG;;
 		c) CUT_ENZ=$OPTARG;;
-		d) MIN_INSERT_SIZE=$OPTARG;;
+		i) MIN_INSERT_SIZE=$OPTARG;;
 		\?) usage
 			echo "error: unrecognized option -$OPTARG";
 			exit 1
@@ -66,87 +61,39 @@ do
 	esac
 done
 
-if [ $# -lt 8 ] ; then
+if [ $# -lt 12 ] ; then
    usage
    echo "error: too few arguments"
    exit 1
 fi
 
-# THREADS
-if [ -z ${THREADS+x} ]; then 
- 	echo "error: missing variable -t THREADS";
- 	exit 1;
-fi
+
+# check if varaibles exist
+[ -z ${THREADS+x} ] && { echo "error: missing variable -t argument"; exit 1; }
+[ -z ${MAX_MEM+x} ] && { echo "error: missing variable -m argument"; exit 1; }
+[ -z ${FASTQ1+x} ] && { usage; echo "error: missing -f argument."; exit 1; }
+[ -z ${FASTQ2+x} ] && { usage; echo "error: missing -r argument."; exit 1; }
+[ -z ${MARK_DUPLICATE+x} ] && { usage; echo "error: missing -p argument."; exit 1; }
+[ -z ${PREFIX+x} ] && { usage; echo "error: missing -n argument."; exit 1; }
+[ -z ${GENOME+x} ] && { usage; echo "error: missing -g argument."; exit 1; }
+[ -z ${CUT_ENZ+x} ] && { usage; echo "error: missing -c argument."; exit 1; }
+[ -z ${MIN_INSERT_SIZE+x} ] && { usage; echo "error: missing -d argument."; exit 1; }
+
+# check if files exist
+[ ! -f $FASTQ1 ] && { usage; echo "error: -f '$FASTQ1' not exists."; exit 1; }
+[ ! -f $FASTQ2 ] && { usage; echo "error: -r '$FASTQ2' not exists."; exit 1; }
+[ ! -f $MARK_DUPLICATE ] && { usage; echo "error: -p '$MARK_DUPLICATE' not exists."; exit 1; }
+[ ! -f $GENOME ] && { usage; echo "error: -g '$GENOME' not exists."; exit 1; }
+[ ! -f $CUT_ENZ ] && { usage; echo "error: -c '$CUT_ENZ' not exists."; exit 1; }
+
+# check format of input
 re='^[0-9]+$'
 if ! [[ $THREADS =~ $re ]] ; then
    echo "error: '$THREADS' Not a number" >&2; 
    exit 1
 fi
 
-# check if FASTQ1 file exists
-if [ -z ${FASTQ1+x} ]; then 
- 	echo "error: missing variable -f FASTQ1";
- 	exit 1;
-fi
-if [ ! -f $FASTQ1 ]; then
-	usage
-    echo "error: '$FASTQ1' not exists.";
-	exit 1
-fi
-
-# check if FASTQ2 file exists
-if [ -z ${FASTQ2+x} ]; then 
- 	echo "error: missing variable -f FASTQ2";
- 	exit 1;
-fi
-if [ ! -f $FASTQ2 ]; then
-	usage
-    echo "error: '$FASTQ2' not exists.";
-	exit 1
-fi
-
-# check if MARK_DUPLICATE file exists
-if [ -z ${MARK_DUPLICATE+x} ]; then 
- 	echo "error: missing variable -p MARK_DUPLICATE";
- 	exit 1;
-fi
-if [ ! -f $MARK_DUPLICATE ]; then
-	usage
-    echo "error: '$MARK_DUPLICATE' not exists.";
-	exit 1
-fi
-
-# check if GENOME file exists
-if [ -z ${GENOME+x} ]; then 
- 	echo "error: missing variable -g GENOME";
- 	exit 1;
-fi
-if [ ! -f $GENOME ]; then
-	usage
-    echo "error: '$GENOME' not exists.";
-	exit 1
-fi
-
-if [ -z ${CUT_ENZ+x} ]; then 
- 	echo "error: missing variable -c $CUT_ENZ";
- 	exit 1;
-fi
-if [ ! -f $CUT_ENZ ]; then
-	usage
-    echo "error: '$CUT_ENZ' not exists.";
-	exit 1
-fi
-
-# check if input type
-if [ -z ${MIN_INSERT_SIZE+x} ]; then 
- 	echo "error: missing variable -c $MIN_INSERT_SIZE";
- 	exit 1;
-fi
-re='^[0-9]+$'
-if ! [[ $MIN_INSERT_SIZE =~ $re ]] ; then
-   echo "error: '$MIN_INSERT_SIZE' Not a number" >&2; 
-   exit 1
-fi
+[ "$THREADS" -lt 2 ] && { usage; echo "error: -t THREADS must be no less than 2."; exit 1; }
 
 echo $0 $* 2>&1 | tee $PREFIX.log 
 echo 2>&1 | tee -a $PREFIX.log
@@ -161,101 +108,66 @@ echo MIN_INSERT_SIZE=$MIN_INSERT_SIZE 2>&1 | tee -a $PREFIX.log
 
 echo 2>&1 | tee -a $PREFIX.log
 
-if [ ! -d $PREFIX\_tmp ]; then
-	mkdir $PREFIX\_tmp
-fi
 
-echo "$(date) Step1. map reads and choose chemeric reads and non-uniquely mapped reads" 2>&1 | tee -a $PREFIX.log
-if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.bam ]; then
-	if [ ${FASTQ1: -4} == ".bz2" ];
-	then
-		bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ1) 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | \
-			chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam
-	else
-		bwa mem -t $THREADS $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | \
-			chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R1.uniq.bam
-	fi
-else
-	printf 'warning: %s_tmp/%s_R1.uniq.bam already exists.\n' "$PREFIX" "$PREFIX" 2>&1 | tee -a $PREFIX.log
+if [ -d $PREFIX\_tmp ]; then
+	rm -r $PREFIX\_tmp
 fi
+mkdir $PREFIX\_tmp
 
-if [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.bam ]; then
-	if [ ${FASTQ2: -4} == ".bz2" ];
-	then
-		bwa mem -t $THREADS $GENOME <(bzip2 -dc $FASTQ2) 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | \
-			chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam
-	else
-		bwa mem -t $THREADS $GENOME $FASTQ2 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | \
-			chimeric.pl - | samtools view -F 2048 -q 10 -bS - > $PREFIX\_tmp/$PREFIX\_R2.uniq.bam
-	fi	
-else
-	printf 'warning: %s_tmp/%s_R2.uniq.bam already exists.\n' "$PREFIX" "$PREFIX" 2>&1 | tee -a $PREFIX.log
-fi
-wait
 
-echo 
-echo "$(date) Step2. filter reads that are  > 500bp far from restriction cutter sites" 2>&1 | tee -a $PREFIX.log
-if [ ! -f $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam ] || [ ! -f $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam ]; 
-then
-	samtools view -b -L $CUT_ENZ $PREFIX\_tmp/$PREFIX\_R1.uniq.bam > $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam &
-	samtools view -b -L $CUT_ENZ $PREFIX\_tmp/$PREFIX\_R2.uniq.bam > $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam &
-	wait
-	samtools sort -m 2G -n $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted 
-	samtools sort -m 2G -n $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted 
-	rm $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.bam	
-	rm $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.bam	
-fi
-
-echo
-echo "$(date) Step4. pair up two ends and sort based on coordinates" 2>&1 | tee -a $PREFIX.log
-if [ ! -f $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.sorted.bam ]; then
-	pair2mates -m $MIN_INSERT_SIZE -o $PREFIX\_tmp/$PREFIX.uniq.filtered.paired $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam	
-	samtools view -h $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.bam | awk 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) >= 10000) print }' | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.bam
-	samtools sort -m 2G $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.bam $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.sorted
-	rm $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.bam
-else
-	printf 'warning: %s_tmp/%s.uniq.filtered.paired.bam already exist.\n'  "$PREFIX" "$PREFIX" 2>&1 | tee -a $PREFIX.log
-fi
-
-echo 
-echo "$(date) Step6. Remove PCR duplication" 2>&1 | tee -a $PREFIX.log
-if [ ! -f $PREFIX.uniq.filtered.paired.cis.longRange.sorted.nodup.bam ]; then
-	java -Xmx2G -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.sorted.bam OUTPUT=$PREFIX.bam ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=metrics.$PREFIX.txt TMP_DIR=$PREFIX\_tmp
-	samtools index $PREFIX.bam
-else
-	printf 'warning: %s_tmp/%s.uniq.filtered.paired.sorted.nodup.bam already exist.\n'  "$PREFIX" "$PREFIX" 2>&1 | tee -a $PREFIX.log
-fi
-
-echo 
-echo "$(date) Step7. Summerizing ..." 2>&1 | tee -a $PREFIX.log
+echo "$(date) Step1. mapping and pairing and filtering reads ..." 
 if [ ${FASTQ1: -4} == ".bz2" ];
 then
-	TOTAL_READS=$(bzcat $FASTQ1 | wc -l | awk '{print $1}')
-elif [ ${FASTQ1: -3} == ".gz" ]
-then
-	TOTAL_READS=$(zcat $FASTQ1 | wc -l | awk '{print $1}') 
+	hicmap_pair_up_filter -f <(bwa mem -t $((THREADS / 2)) $GENOME <(bzcat -dc $FASTQ1) 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | chimeric.pl -) -r <(bwa mem -t $((THREADS / 2)) $GENOME <(bzcat -dc $FASTQ2) 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | chimeric.pl -) 2>>$PREFIX.log \
+		| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>> $PREFIX.log | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
 else
-	TOTAL_READS=$(wc -l $FASTQ1 | awk '{print $1}') 
+	hicmap_pair_up_filter -f <(bwa mem -t $((THREADS / 2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | chimeric.pl -) -r <(bwa mem -t $((THREADS / 2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | chimeric.pl -) 2>>$PREFIX.log \
+		| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>>$PREFIX.log | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
 fi
 
-UNIQ_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.bam | wc -l | awk '{print $1}') 
-UNIQ_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.bam | wc -l | awk '{print $1}') 
-UNIQ_FILTERED_READS_R1=$(samtools view $PREFIX\_tmp/$PREFIX\_R1.uniq.filtered.sorted.bam | wc -l | awk '{print $1}') 
-UNIQ_FILTERED_READS_R2=$(samtools view $PREFIX\_tmp/$PREFIX\_R2.uniq.filtered.sorted.bam | wc -l | awk '{print $1}')
-UNIQ_FILTERED_PAIRED_READS_CIS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.bam | wc -l | awk '{print $1}')
-UNIQ_FILTERED_PAIRED_READS_TRANS=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.trans.bam | wc -l | awk '{print $1}')
-UNIQ_FILTERED_PAIRED_READS_CIS_LONG=$(samtools view $PREFIX\_tmp/$PREFIX.uniq.filtered.paired.cis.longRange.sorted.bam | wc -l | awk '{print $1}')
-UNIQ_FILTERED_PAIRED_READS_CIS_LONG_NODUP=$(samtools view $PREFIX.bam | wc -l | awk '{print $1}')
+[ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam ] && { echo -e "Step1 failed. Aborting."; exit 1;}
 
-echo "================================ Summary ==================================" 2>&1 | tee -a $PREFIX.log
-echo "total number of reads = $((TOTAL_READS/4))" 2>&1 | tee -a $PREFIX.log
-echo "uniquely mapped reads (MAPQ>10) for R1=$UNIQ_READS_R1 and R2=$UNIQ_READS_R2" 2>&1 | tee -a $PREFIX.log
-echo "500bp closed to cutter sites for R1=$UNIQ_FILTERED_READS_R1 and R2=$UNIQ_FILTERED_READS_R2" 2>&1 | tee -a $PREFIX.log
-echo "total number of paired trans-reads = $((UNIQ_FILTERED_PAIRED_READS_TRANS/2))" 2>&1 | tee -a $PREFIX.log
-echo "total number of paired cis-reads = $((UNIQ_FILTERED_PAIRED_READS_CIS/2))" 2>&1 | tee -a $PREFIX.log
-echo "total number of long-range cis-reads = $((UNIQ_FILTERED_PAIRED_READS_CIS_LONG/2))" 2>&1 | tee -a $PREFIX.log
-echo "total number of non-dup long-range cis-reads = $((UNIQ_FILTERED_PAIRED_READS_CIS_LONG_NODUP/2))" 2>&1 | tee -a $PREFIX.log
+
+echo "$(date) Step2. sorting based on genomic coordinates ..." 
+samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted
+rm $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
+[ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam ] && { echo -e "Step2 failed. Aborting."; exit 1;}
+
+
+echo -e "$(date) Step3. remove PCR duplications ..." 
+java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam  OUTPUT=$PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam  ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt  TMP_DIR=$PREFIX\_tmp
+[ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam ] && { echo -e "Step3 failed. Aborting."; exit 1;}
+rm $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam
+
+echo "$(date) Step4. split reads into long/short-range reads ..." 
+samtools view -h $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam \
+	| awk -v var="$MIN_INSERT_SIZE" 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) >= var) print }' \
+		| samtools view -bS - > $PREFIX.long.bam &
+ip_long=$!
+samtools view -h $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam \
+	| awk -v var="$MIN_INSERT_SIZE" 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) < var) print }' \
+		| samtools view -bS - > $PREFIX.short.bam &
+ip_short=$!
+
+while kill -0 $ip_long 2>/dev/null
+do
+  sleep 1
+done
+while kill -0 $ip_short 2>/dev/null
+do
+  sleep 1
+done
+
+[ ! -f $PREFIX.short.bam  ] || [ ! -s $PREFIX.short.bam  ] && { echo -e "Step4 failed. Aborting."; exit 1;}
+[ ! -f $PREFIX.long.bam  ] || [ ! -s $PREFIX.long.bam  ] && { echo -e "Step4 failed. Aborting."; exit 1;}
+
+echo -e "$(date) Step5. indexing $PREFIX.long.bam and $PREFIX.short.bam ..." 
+samtools index $PREFIX.long.bam
+samtools index $PREFIX.short.bam
+
+echo -e "$(date) Step6. summerizing and cleaning up ..." 
+UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP=$(samtools view $PREFIX.long.bam | wc -l | awk '{print $1}')
+echo "number of unique long-range cis pairs after filtered by cutter cites $((UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP/2))" 2>&1 | tee -a $PREFIX.log
 
 # clean up
-# rm -r $PREFIX\_tmp/
-
+rm -r $PREFIX\_tmp/

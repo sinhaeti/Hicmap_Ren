@@ -31,7 +31,7 @@ Options:
   -- optional:
 	-i  INSERT_SIZE      pairs with distance smaller that MIN_INSERT_SIZE will be filtered [10,000].
 	-t  INT              threads to be used for BWA mapping [2].
-	-m  MAX_MEM          max memory will be used for .bam sorting and MarkDuplicates.jar [2G].
+	-m  MAX_MEM          max memory will be used for samtools sort and  MarkDuplicates.jar  [2G].
 
 EOF
 }
@@ -142,7 +142,7 @@ rm $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam
 echo "$(date) Step4. select long-range cis nodup pairs ..." 
 samtools view -h $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam \
 	| awk -v var="$MIN_INSERT_SIZE" 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) >= var) print }' \
-		| samtools view -bS - > $PREFIX.long.bam &
+		| samtools view -bS - > $PREFIX.bam &
 ip_long=$!
 
 if [ ! -z ${SHORT+x} ] 
@@ -167,10 +167,10 @@ then
 fi
 
 
-[ ! -f $PREFIX.long.bam  ] || [ ! -s $PREFIX.long.bam  ] && { echo -e "Step4 failed. Aborting."; exit 1;}
+[ ! -f $PREFIX.bam  ] || [ ! -s $PREFIX.bam  ] && { echo -e "Step4 failed. Aborting."; exit 1;}
 
 echo -e "$(date) Step5. indexing $PREFIX.long.bam and $PREFIX.short.bam ..." 
-samtools index $PREFIX.long.bam
+samtools index $PREFIX.bam
 
 if [ ! -z ${SHORT+x} ] 
 then 
@@ -180,7 +180,7 @@ fi
 
 
 echo -e "$(date) Step6. summerizing and cleaning up ..." 
-UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP=$(samtools view $PREFIX.long.bam | wc -l | awk '{print $1}')
+UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP=$(samtools view $PREFIX.bam | wc -l | awk '{print $1}')
 echo "number of unique long-range cis pairs after filtered by cutter cites $((UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP/2))" 2>&1 | tee -a $PREFIX.log
 
 # clean up

@@ -3,7 +3,7 @@
 $ git clone --depth=1 https://github.com/r3fang/Hicmap_Ren.git
 $ cd Hicmap_Ren
 $ bash install.sh
-$ # download demo HiC data (Dixon 2016)
+$ # download demo HiC data 
 $ wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/demo_R1.fastq.bz2
 $ wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/demo_R2.fastq.bz2
 $ wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/cutter_sites.tar.gz 
@@ -11,7 +11,7 @@ $ tar -xvzf cutter_sites.tar.gz
 $ mkdir BWAIndex/; wget http://enhancer.sdsc.edu/r3fang/Hicmap_Ren/mm9.fa -P BWAIndex
 $ bwa index BWAIndex/mm9.fa
 $ hicmap -f demo_R1.fastq.bz2 -r demo_R2.fastq.bz2 -n demo -p Picard/MarkDuplicates.jar \
-  -g BWAIndex/mm9.fa -c cutter_sites/mm9.Hind3.1000bp.bed
+   -g BWAIndex/mm9.fa -c cutter_sites/mm9.Hind3.1000bp.bed
 ```
 
 ##Depedency
@@ -21,10 +21,10 @@ $ hicmap -f demo_R1.fastq.bz2 -r demo_R2.fastq.bz2 -n demo -p Picard/MarkDuplica
 
 ##Introduction
 
-**Hicmap** is a simple but efficient and fast pipeline for analyzing Hi-C data which includes alignment, reads filtering and heatmap generation.
+**Hicmap** is a fast pipeline for mapping Hi-C data.
 
 ```
-$ bash bin/hicmap
+$ hicmap
 
 Program: hicmap (Hi-C analysis pipeline)
 Version: v07.04.2016

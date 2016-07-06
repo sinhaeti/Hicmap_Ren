@@ -115,31 +115,24 @@ fi
 mkdir $PREFIX\_tmp
 
 
-echo "$(date) Step1. mapping and pairing and filtering reads ..." 
+echo "$(date) Step1. mapping and pairing and filtering and sorting reads ..." 
 if [ ${FASTQ1: -4} == ".bz2" ];
 then
 	hicmap_pair_up_filter -f <(bwa mem -t $((THREADS / 2)) $GENOME <(bzcat -dc $FASTQ1) 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | chimeric.pl -) -r <(bwa mem -t $((THREADS / 2)) $GENOME <(bzcat -dc $FASTQ2) 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | chimeric.pl -) 2>>$PREFIX.log \
-		| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>> $PREFIX.log | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
+		| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>> $PREFIX.log | samtools view -bS - | samtools sort -m $MAX_MEM - $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted
 else
 	hicmap_pair_up_filter -f <(bwa mem -t $((THREADS / 2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX.R1.bwa.log | chimeric.pl -) -r <(bwa mem -t $((THREADS / 2)) $GENOME $FASTQ1 2> $PREFIX\_tmp/$PREFIX.R2.bwa.log | chimeric.pl -) 2>>$PREFIX.log \
-		| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>>$PREFIX.log | samtools view -bS - > $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
+		| samtools view -h -L $CUT_ENZ - | hicmap_cutter_sites_filter $MIN_INSERT_SIZE - 2>>$PREFIX.log | samtools sort -m $MAX_MEM - $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted
 fi
-
-[ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam ] && { echo -e "Step1 failed. Aborting."; exit 1;}
-
-
-echo "$(date) Step2. sorting based on genomic coordinates ..." 
-samtools sort -m $MAX_MEM $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted
-rm $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.bam
 [ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam ] && { echo -e "Step2 failed. Aborting."; exit 1;}
 
 
-echo -e "$(date) Step3. remove PCR duplications ..." 
+echo -e "$(date) Step2. remove PCR duplications ..." 
 java -Xmx$MAX_MEM -jar $MARK_DUPLICATE INPUT=$PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam  OUTPUT=$PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam  ASSUME_SORTED=true REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT METRICS_FILE=$PREFIX\_tmp/metrics.$PREFIX.txt  TMP_DIR=$PREFIX\_tmp
 [ ! -f $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam ] || [ ! -s $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam ] && { echo -e "Step3 failed. Aborting."; exit 1;}
 rm $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.bam
 
-echo "$(date) Step4. select long-range cis nodup pairs ..." 
+echo "$(date) Step3. select long-range cis nodup pairs ..." 
 samtools view -h $PREFIX\_tmp/$PREFIX.uniq.paired.cis.filtered.sorted.nodup.bam \
 	| awk -v var="$MIN_INSERT_SIZE" 'function abs(v) {return v < 0 ? -v : v} { if(substr($1, 1, 1)=="@" || abs($9) >= var) print }' \
 		| samtools view -bS - > $PREFIX.bam &
@@ -169,7 +162,7 @@ fi
 
 [ ! -f $PREFIX.bam  ] || [ ! -s $PREFIX.bam  ] && { echo -e "Step4 failed. Aborting."; exit 1;}
 
-echo -e "$(date) Step5. indexing $PREFIX.long.bam and $PREFIX.short.bam ..." 
+echo -e "$(date) Step4. indexing $PREFIX.long.bam and $PREFIX.short.bam ..." 
 samtools index $PREFIX.bam
 
 if [ ! -z ${SHORT+x} ] 
@@ -179,7 +172,7 @@ then
 fi
 
 
-echo -e "$(date) Step6. summerizing and cleaning up ..." 
+echo -e "$(date) Step5. summerizing and cleaning up ..." 
 UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP=$(samtools view $PREFIX.bam | wc -l | awk '{print $1}')
 echo "number of unique long-range cis pairs after filtered by cutter cites $((UNIQ_PAIRED_CIS_FILTERED_SORTED_LONG_NODUP/2))" 2>&1 | tee -a $PREFIX.log
 

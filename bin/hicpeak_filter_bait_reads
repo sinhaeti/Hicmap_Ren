@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+import optparse
+import sys
+import random
+
+class sam_alignment:
+    """A class for sam alignment """
+    def __init__(self, str):
+        if len(str):
+            elems = str.split()
+            self.name = elems[0]
+            self.flag = int(elems[1])
+            self.chrom1 = elems[2]
+            self.pos1 = int(elems[3])
+            self.score = int(elems[4])
+            self.cigar = elems[5]
+            self.chrom2 = elems[6]            
+            self.pos2 = int(elems[7])
+            self.insert_size = int(elems[8])
+            self.seq = elems[9]
+            self.qual = elems[10]
+            self.unknown1 = elems[11]
+        else:
+            exit('error: sam_alignment input is empty;')
+    
+    def aln_str(self):
+        return '\t'.join([self.name,  str(self.flag), self.chrom1,
+               str(self.pos1), str(self.score), str(self.cigar),
+               self.chrom2, str(self.pos2), str(self.insert_size), 
+               self.seq, self.qual, self.unknown1])
+
+def std_print(s):
+    try:
+        print s,
+    except IOError:
+        try:
+            sys.stdout.close()
+        except IOError:
+            pass
+        try:
+            sys.stderr.close()
+        except IOError:
+            pass
+    
+def main():
+    dist = int(sys.argv[1])
+    for line in sys.stdin:
+        if line[:3]== "@SQ" or line[:3]== "@PG" or line[:3]== "@HD":
+             std_print(line)
+        else:
+            aln = sam_alignment(line)
+            if abs(aln.insert_size) >= dist:
+                tmp = '\t'.join([aln.name,  ["0", "16"][random.randint(0, 1)], aln.chrom1,
+                    str(aln.pos2), "60", str(aln.cigar),
+                    "*", "0", "0", aln.seq, aln.qual, aln.unknown1, "\n"])
+                std_print(tmp)
+                
+            
+            
+if __name__ == '__main__':
+    main()

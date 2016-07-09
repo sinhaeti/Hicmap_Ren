@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # predict interaction peaks anchored at one bait
+# hicpeak -t MY_73.bam -i MY_71.bam -r chr1:72250000-72270000 -n Mreg -l 2000 -b 500 -w 6000000 -s 1
 set -e
 
 trap ctrl_c INT
@@ -38,6 +39,7 @@ Options:
   -- optional:
 	-l  EXTEND_LEN       extend reads to this fragment size [2000].
 	-b  BIN_SIZE         size of the bins, in bases [500].
+    -c  CUTOFF           cutoff for peak calling [0.6].
 	-w  WINDOW           only predict peaks within the large window 
                          flanking bait point[6,000,000].
 	-s  SMOOTH_FACTOR    smooth length defines a window, larger than the
@@ -50,8 +52,9 @@ EXTEND_LEN=2000
 BIN_SIZE=500
 SMOOTH_FACTOR=1
 WINDOW=6000000
+CUTOFF=1.5
 # PART IV receiving arguments
-while getopts "t:i:r:n:l:w:b:s:" opt;
+while getopts "t:i:r:n:l:w:b:s:c:" opt;
 do
 	case "$opt" in
 		t) TREAT=$OPTARG;;
@@ -62,6 +65,7 @@ do
 		w) WINDOW=$OPTARG;;
 		b) BIN_SIZE=$OPTARG;;
 		s) SMOOTH_FACTOR=$OPTARG;;
+		c) CUTOFF=$OPTARG;;
 		\?) usage
 			echo "error: unrecognized option -$OPTARG";
 			exit 1
@@ -85,6 +89,7 @@ fi
 [ -z ${EXTEND_LEN+x} ] && { usage; echo "error: missing -l EXTEND_LEN argument."; exit 1; }
 [ -z ${BIN_SIZE+x} ] && { usage; echo "error: missing -b BIN_SIZE argument."; exit 1; }
 [ -z ${SMOOTH_FACTOR+x} ] && { usage; echo "error: missing -s SMOOTH_FACTOR argument."; exit 1; }
+[ -z ${CUTOFF+x} ] && { usage; echo "error: missing -c CUTOFF argument."; exit 1; }
 
 # check if files exist
 [ ! -f $TREAT ] && { usage; echo "error: -f '$TREAT' not exists."; exit 1; }
@@ -100,6 +105,8 @@ re='^[0-9]+$'
 ! [[ $BIN_SIZE =~ $re ]] && { usage; echo -e "error: '$BIN_SIZE' Not a number"; exit 1; }
 ! [[ $SMOOTH_FACTOR =~ $re ]] && { usage; echo -e "error: '$SMOOTH_FACTOR' Not a number"; exit 1; }
 ! [[ $WINDOW =~ $re ]] && { usage; echo -e "error: '$WINDOW' Not a number"; exit 1; }
+re='^[0-9]+\.?[0-9]*$'
+! [[ $CUTOFF =~ $re ]] && { usage; echo -e "error: '$CUTOFF' Not a float number"; exit 1; }
 
 IFS=':' read -a chr <<< "$BAIT_REGION"
 IFS='-' read -a pos <<< "${chr[1]}"
@@ -130,11 +137,15 @@ echo SMOOTH_FACTOR=$SMOOTH_FACTOR 2>&1 | tee -a $PREFIX.log
 echo 2>&1 | tee -a $PREFIX.log
 
 echo -e "$REGION_CHR\t$REGION_START\t$REGION_END" > $PREFIX.bed
-samtools view -h $TREAT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_bait_reads $REGION_WIDTH | samtools view -bS - | samtools sort - $PREFIX.treat
+samtools view -h $TREAT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_bait_reads 20000 | samtools view -bS - | samtools sort - $PREFIX.treat
 samtools index $PREFIX.treat.bam
-samtools view -h $INPUT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_bait_reads $REGION_WIDTH | samtools view -bS - | samtools sort - $PREFIX.input
+samtools view -h $INPUT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_bait_reads 20000 | samtools view -bS - | samtools sort - $PREFIX.input
 samtools index $PREFIX.input.bam
-hicpeak_peak_call treat_file=\'$PREFIX.treat.bam\' input_file=\'$PREFIX.input.bam\' CHROM=\'$REGION_CHR\' START=$WINDOW_START END=$WINDOW_END step_size=$EXTEND_LEN extend_len=$EXTEND_LEN bin_size=$BIN_SIZE smooth_factor=$SMOOTH_FACTOR prefix=\'$PREFIX\'
+hicpeak_peak_call treat_file=\'$PREFIX.treat.bam\' input_file=\'$PREFIX.input.bam\' \
+	CHROM=\'$REGION_CHR\' START=$WINDOW_START END=$WINDOW_END step_size=$BIN_SIZE \
+	extend_len=$EXTEND_LEN bin_size=$BIN_SIZE smooth_factor=$SMOOTH_FACTOR prefix=\'$PREFIX\' \
+	cutoff=$CUTOFF
+
 rm $PREFIX.treat.bam
 rm $PREFIX.input.bam
 rm $PREFIX.treat.bam.bai

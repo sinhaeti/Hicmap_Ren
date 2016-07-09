@@ -7,3 +7,4 @@ bedGraphToBigWig
 tmp*
 demo*
 bin/hicmap_V2
+bin/hicto4c_old

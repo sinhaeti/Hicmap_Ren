@@ -133,7 +133,7 @@ samtools view -h $TREAT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_b
 samtools index $PREFIX.treat.bam
 samtools view -h $INPUT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_bait_reads $REGION_WIDTH | samtools view -bS - | samtools sort - $PREFIX.input
 samtools index $PREFIX.input.bam
-Rscript hicTo4c.R treat_file=\'$PREFIX.treat.bam\' input_file=\'$PREFIX.input.bam\' CHROM=\'$REGION_CHR\' START=$WINDOW_START END=$WINDOW_END step_size=$EXTEND_LEN extend_len=$EXTEND_LEN bin_size=$BIN_SIZE smooth_factor=$SMOOTH_FACTOR prefix=\'$PREFIX\'
+hicpeak_peak_call treat_file=\'$PREFIX.treat.bam\' input_file=\'$PREFIX.input.bam\' CHROM=\'$REGION_CHR\' START=$WINDOW_START END=$WINDOW_END step_size=$EXTEND_LEN extend_len=$EXTEND_LEN bin_size=$BIN_SIZE smooth_factor=$SMOOTH_FACTOR prefix=\'$PREFIX\'
 rm $PREFIX.treat.bam
 rm $PREFIX.input.bam
 rm $PREFIX.treat.bam.bai

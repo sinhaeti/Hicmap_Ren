@@ -1,0 +1,75 @@
+#!/usr/bin/env Rscript
+
+# Rscript hicTo4c.R treat_file=\'low/crest/crest.bin.high.txt\' input_file=\'low/crest/crest.bin.high.txt\' extend_len=$EXTEND_LEN bin_size=$BIN_SIZE step_size=$STEP_SIZE smooth_factor=$SMOOTH_FACTOR prefix=$PREFIX
+
+suppressMessages(library(ShortRead))
+suppressMessages(library(rtracklayer))
+
+# PART II - load in arguments
+args <- commandArgs(trailingOnly = TRUE)
+if(length(args) < 5){
+    stop("too few arguments.")
+}else{
+    for(i in 1:length(args)){
+		invisible(eval(parse(text=args[[i]])))
+    }
+}
+
+if(!exists("treat_file")) stop("argument treat_file missing")
+if(!exists("input_file")) stop("argument input_file missing")
+if(!exists("extend_len")) stop("argument extend_len missing")
+if(!exists("step_size")) stop("argument step_size missing")
+	
+if(!exists("bin_size")) stop("argument bin_size missing")
+if(!exists("smooth_factor")) stop("smooth_factor FDR missing")
+if(!exists("prefix")) stop("prefix FDR missing")
+if(!exists("CHROM")) stop("prefix CHROM missing")
+if(!exists("START")) stop("prefix START missing")
+if(!exists("END")) stop("prefix END missing")
+
+if(!file.exists(treat_file)) stop("file treat_file not exists")
+if(!file.exists(input_file)) stop("file input_file not exists")
+
+if(length(treat <- readGAlignments(treat_file))==0){ stop("Error: input is empty"); };
+if(length(input <- readGAlignments(input_file))==0){ stop("Error: input is empty"); };
+treat.gr <- as(treat, "GRanges")
+input.gr <- as(input, "GRanges")
+
+treat.resize.gr <- resize(treat.gr, fix="center", extend_len)
+input.resize.gr <- resize(input.gr, fix="center", extend_len)
+	
+tmp <- seq(START + bin_size, END - bin_size, by=step_size) 
+bins.gr <- GRanges(CHROM, IRanges(tmp-bin_size/2, tmp+bin_size/2))
+
+# signal per million reads with 100bp
+x <- countOverlaps(bins.gr, treat.resize.gr, ignore.strand=TRUE)/((length(treat.resize.gr)) * extend_len) * 1000000
+x <- sapply((smooth_factor+1):(length(x)-smooth_factor), function(i)   mean(x[(i-smooth_factor):(i+smooth_factor)]))
+x[which(is.na(x))] = 0
+bins.gr$treat <- c(rep(0, smooth_factor), x, rep(0, smooth_factor))
+#bins.gr$treat <- countOverlaps(bins.gr, treat.resize.gr, ignore.strand=TRUE)/((length(treat.resize.gr))) * (1000000)
+
+x <- countOverlaps(bins.gr, input.resize.gr, ignore.strand=TRUE)/((length(input.resize.gr)) * extend_len) * 1000000
+x <- sapply((smooth_factor+1):(length(x)-smooth_factor), function(i)   mean(x[(i-smooth_factor):(i+smooth_factor)]))
+x[which(is.na(x))] = 0
+bins.gr$input <- c(rep(0, smooth_factor), x, rep(0, smooth_factor))
+#bins.gr$input <-  countOverlaps(bins.gr, input.resize.gr, ignore.strand=TRUE)/((length(input.resize.gr))) * 1000000
+
+bins.gr$score <- bins.gr$treat - bins.gr$input
+bins.gr$score[which(bins.gr$score < 0)] <- 0
+#bins.gr$score <- bins.gr$score/max(bins.gr$score)
+#bins.gr$score[which(is.na(bins.gr$score))] <- 0
+bins <- as.data.frame(bins.gr)
+#write.table(data.frame(bins[,1], tmp - step_size/2, tmp + step_size/2, bins$input), file = paste(prefix, ".input.bdg", sep=""), append = FALSE, quote = FALSE, sep = "\t",
+#           eol = "\n", na = "NA", dec = ".", row.names = FALSE,
+#           col.names = FALSE, qmethod = c("escape", "double"),
+#           fileEncoding = "")
+#
+#write.table(data.frame(bins[,1], tmp - step_size/2, tmp + step_size/2, bins$treat), file = paste(prefix, ".treat.bdg", sep=""), append = FALSE, quote = FALSE, sep = "\t",
+#           eol = "\n", na = "NA", dec = ".", row.names = FALSE,
+#           col.names = FALSE, qmethod = c("escape", "double"),
+#           fileEncoding = "")
+#
+write.table(data.frame(bins[,1], tmp - step_size/2, tmp + step_size/2, bins$score), file = paste(prefix, ".norm.bdg", sep=""), append = FALSE, quote = FALSE, sep = "\t",
+           eol = "\n", na = "NA", dec = ".", row.names = FALSE,
+           col.names = FALSE, qmethod = c("escape", "double"),
+           fileEncoding = "")

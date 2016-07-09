@@ -12,6 +12,7 @@ function ctrl_c() {
 # PART I check weather softwares installed
 command -v samtools >/dev/null 2>&1 || { echo >&2 "hicpeak requires samtools but it's not installed.  Aborting."; exit 1; }
 command -v hicpeak_filter_bait_reads >/dev/null 2>&1 || { echo >&2 "hicpeak requires hicpeak_filter_bait_reads but it's not installed.  Aborting."; exit 1; }
+command -v hicpeak_peak_call >/dev/null 2>&1 || { echo >&2 "hicpeak requires hicpeak_peak_call but it's not installed.  Aborting."; exit 1; }
 
 # PART II usage info
 usage(){

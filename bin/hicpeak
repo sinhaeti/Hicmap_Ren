@@ -136,13 +136,13 @@ echo SMOOTH_FACTOR=$SMOOTH_FACTOR 2>&1 | tee -a $PREFIX.log
 
 echo 2>&1 | tee -a $PREFIX.log
 
-echo -e "$REGION_CHR\t$REGION_START\t$REGION_END" > $PREFIX.bed
-samtools view -h $TREAT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_bait_reads 20000 | samtools view -bS - | samtools sort - $PREFIX.treat
+#echo -e "$REGION_CHR\t$REGION_START\t$REGION_END" > $PREFIX.bed
+samtools view -h $TREAT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_bait_reads $REGION_WIDTH | samtools view -bS - | samtools sort - $PREFIX.treat
 samtools index $PREFIX.treat.bam
-samtools view -h $INPUT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_bait_reads 20000 | samtools view -bS - | samtools sort - $PREFIX.input
+samtools view -h $INPUT $REGION_CHR:$REGION_START-$REGION_END | hicpeak_filter_bait_reads $REGION_WIDTH | samtools view -bS - | samtools sort - $PREFIX.input
 samtools index $PREFIX.input.bam
-hicpeak_peak_call treat_file=\'$PREFIX.treat.bam\' input_file=\'$PREFIX.input.bam\' \
-	CHROM=\'$REGION_CHR\' START=$WINDOW_START END=$WINDOW_END step_size=$BIN_SIZE \
+hicpeak_peak_call treat_file=\'$PREFIX.treat.bam\' input_file=\'$PREFIX.input.bam\' window_size=$WINDOW \
+	CHROM=\'$REGION_CHR\' START=$REGION_START END=$REGION_END step_size=$BIN_SIZE \
 	extend_len=$EXTEND_LEN bin_size=$BIN_SIZE smooth_factor=$SMOOTH_FACTOR prefix=\'$PREFIX\' \
 	cutoff=$CUTOFF
 
@@ -152,3 +152,4 @@ rm $PREFIX.treat.bam.bai
 rm $PREFIX.input.bam.bai
 
 echo -e "Succeed!" 2>&1 | tee -a $PREFIX.log
+rm $PREFIX.log

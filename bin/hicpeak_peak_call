@@ -56,6 +56,7 @@ bins.gr$score <- bins.gr$treat - bins.gr$input
 #bins.gr$score[which(bins.gr$score <= 0)] <- 0
 #peaks <- as.data.frame(reduce(resize(bins.gr[which(bins.gr$score > 0)], fix="center", bin_size + 100)))
 bins <- as.data.frame(bins.gr)
+bins <- bins[which(bins$score != 0),]
 #write.table(peaks, file = paste(prefix, ".peaks.bed", sep=""), append = FALSE, quote = FALSE, sep = "\t",
 #           eol = "\n", na = "NA", dec = ".", row.names = FALSE,
 #           col.names = FALSE, qmethod = c("escape", "double"),
